@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="<%= page.lang || 'en' %>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title><%= page.title || site.name %></title>
+
+    <meta
+        name="description"
+        content="<%= page.description || ('Official website of ' + (site.name || 'this Maskanwa entity') + ' in Maskanwa.') %>"
+    >
+
+    <meta name="robots" content="<%= page.robots || 'index, follow' %>">
+
+    <link rel="canonical" href="<%= page.canonical %>">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<%= page.canonical %>">
+    <meta property="og:title" content="<%= page.title || site.name %>">
+    <meta
+        property="og:description"
+        content="<%= page.description || ('Official website of ' + (site.name || 'this Maskanwa entity') + ' in Maskanwa.') %>"
+    >
+    <meta property="og:site_name" content="<%= site.name || 'Maskanwa' %>">
+
+    <% if (page.image) { %>
+    <meta property="og:image" content="<%= page.image %>">
+    <% } %>
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="<%= page.image ? 'summary_large_image' : 'summary' %>">
+    <meta name="twitter:url" content="<%= page.canonical %>">
+    <meta name="twitter:title" content="<%= page.title || site.name %>">
+    <meta
+        name="twitter:description"
+        content="<%= page.description || ('Official website of ' + (site.name || 'this Maskanwa entity') + ' in Maskanwa.') %>"
+    >
+
+    <% if (page.image) { %>
+    <meta name="twitter:image" content="<%= page.image %>">
+    <% } %>
+
+    <meta name="theme-color" content="#0f172a">
+
+    <!--
+        Dynamic favicon.
+
+        The actual site name is escaped by EJS.
+        A fallback is used if no name is available.
+    -->
+    <%
+        const safeSiteName = String(site.name || 'M');
+        const faviconLetter = safeSiteName.trim()
+            ? safeSiteName.trim().charAt(0).toUpperCase()
+            : 'M';
+    %>
+
+    <link
+        rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><text x='50' y='70' font-size='65' font-family='system-ui,sans-serif' font-weight='bold' fill='white' text-anchor='middle'><%= faviconLetter %></text></svg>"
+    >
+
+    <!-- JSON-LD -->
+    <script type="application/ld+json"><%- structuredData %></script>
+
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #2563eb;
+            --accent-dark: #1d4ed8;
+
+            --bg: #ffffff;
+            --surface: #f8fafc;
+            --surface-strong: #f1f5f9;
+
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+
+            --border: #e2e8f0;
+
+            --success: #15803d;
+            --danger: #b91c1c;
+
+            --radius: 10px;
+            --content-width: 820px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text-main);
+
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        img,
+        video,
+        iframe,
+        audio {
+            max-width: 100%;
+        }
+
+        img,
+        video {
+            height: auto;
+        }
+
+        a {
+            overflow-wrap: anywhere;
+        }
+
+        button,
+        input,
+        textarea,
+        select {
+            font: inherit;
+        }
+
+        /* ---------------------------------
+           Header
+        --------------------------------- */
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-inner {
+            width: min(100%, var(--content-width));
+            margin: 0 auto;
+
+            padding: 1rem 1.5rem;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .brand {
+            min-width: 0;
+
+            color: var(--primary);
+            text-decoration: none;
+
+            font-size: 1.15rem;
+            font-weight: 750;
+
+            letter-spacing: -0.02em;
+
+            overflow-wrap: anywhere;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+
+            font-size: 0.95rem;
+            font-weight: 550;
+        }
+
+        nav a:hover {
+            color: var(--primary);
+        }
+
+        nav a:focus-visible,
+        .brand:focus-visible,
+        footer a:focus-visible,
+        main a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible,
+        select:focus-visible,
+        summary:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.35);
+            outline-offset: 3px;
+        }
+
+        /* ---------------------------------
+           Main content
+        --------------------------------- */
+
+        main {
+            width: min(100%, var(--content-width));
+            min-height: 60vh;
+
+            margin: 0 auto;
+            padding: 3rem 1.5rem 4rem;
+        }
+
+        main > :first-child {
+            margin-top: 0;
+        }
+
+        main h1,
+        main h2,
+        main h3,
+        main h4,
+        main h5,
+        main h6 {
+            color: var(--primary);
+            overflow-wrap: anywhere;
+        }
+
+        main h1 {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+
+            font-size: clamp(2rem, 5vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.035em;
+        }
+
+        main h2 {
+            margin-top: 2.75rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+
+            font-size: clamp(1.45rem, 4vw, 1.8rem);
+            font-weight: 700;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        main h3 {
+            margin-top: 2rem;
+
+            font-size: 1.3rem;
+            font-weight: 650;
+        }
+
+        main h4 {
+            margin-top: 1.75rem;
+            font-size: 1.1rem;
+        }
+
+        main p {
+            margin: 0 0 1.35rem;
+            font-size: 1.08rem;
+        }
+
+        main ul,
+        main ol {
+            margin: 0 0 1.5rem;
+            padding-left: 1.5rem;
+
+            font-size: 1.08rem;
+        }
+
+        main li {
+            margin-bottom: 0.45rem;
+        }
+
+        main a {
+            color: var(--accent);
+            font-weight: 550;
+        }
+
+        main a:hover {
+            color: var(--accent-dark);
+        }
+
+        /* ---------------------------------
+           Blockquotes
+        --------------------------------- */
+
+        main blockquote {
+            margin: 1.5rem 0;
+
+            padding: 1rem 1.25rem;
+
+            background: var(--surface);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+
+            color: #475569;
+            font-style: italic;
+        }
+
+        /* ---------------------------------
+           Images / Figures
+        --------------------------------- */
+
+        main img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+
+            border-radius: var(--radius);
+
+            box-shadow:
+                0 4px 14px rgba(15, 23, 42, 0.08);
+        }
+
+        main figure {
+            margin: 2rem 0;
+        }
+
+        main figcaption {
+            margin-top: 0.6rem;
+
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* ---------------------------------
+           Video
+        --------------------------------- */
+
+        main video {
+            display: block;
+
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+
+            margin: 1.5rem 0;
+
+            border-radius: var(--radius);
+            background: #000;
+        }
+
+        /* ---------------------------------
+           Audio
+        --------------------------------- */
+
+        main audio {
+            display: block;
+
+            width: 100%;
+            max-width: 100%;
+
+            margin: 1.5rem 0;
+        }
+
+        /* ---------------------------------
+           Responsive embeds
+        --------------------------------- */
+
+        .maskanwa-embed,
+        .embed {
+            position: relative;
+
+            width: 100%;
+
+            margin: 2rem 0;
+
+            aspect-ratio: 16 / 9;
+
+            overflow: hidden;
+
+            border-radius: var(--radius);
+
+            background: #000;
+        }
+
+        .maskanwa-embed iframe,
+        .embed iframe {
+            position: absolute;
+
+            inset: 0;
+
+            width: 100%;
+            height: 100%;
+
+            border: 0;
+        }
+
+        main > iframe {
+            display: block;
+
+            width: 100%;
+            min-height: 450px;
+
+            margin: 2rem 0;
+
+            border: 0;
+            border-radius: var(--radius);
+        }
+
+        /* ---------------------------------
+           Tables
+        --------------------------------- */
+
+        .table-wrap {
+            width: 100%;
+            margin: 2rem 0;
+
+            overflow-x: auto;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        main table {
+            width: 100%;
+            min-width: 520px;
+
+            border-collapse: collapse;
+
+            font-size: 0.98rem;
+        }
+
+        main caption {
+            padding: 0.75rem;
+
+            color: var(--text-muted);
+            text-align: left;
+        }
+
+        main th,
+        main td {
+            padding: 0.8rem 1rem;
+
+            text-align: left;
+            vertical-align: top;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        main th {
+            background: var(--surface);
+
+            color: var(--primary);
+            font-weight: 650;
+        }
+
+        main tr:last-child th,
+        main tr:last-child td {
+            border-bottom: 0;
+        }
+
+        /* ---------------------------------
+           Code
+        --------------------------------- */
+
+        main code {
+            padding: 0.15rem 0.35rem;
+
+            background: var(--surface-strong);
+            border-radius: 5px;
+
+            font-family:
+                ui-monospace,
+                SFMono-Regular,
+                Menlo,
+                Monaco,
+                Consolas,
+                monospace;
+
+            font-size: 0.9em;
+        }
+
+        main pre {
+            max-width: 100%;
+
+            margin: 1.5rem 0;
+            padding: 1rem;
+
+            overflow-x: auto;
+
+            background: #0f172a;
+            color: #f8fafc;
+
+            border-radius: var(--radius);
+        }
+
+        main pre code {
+            padding: 0;
+
+            background: transparent;
+            color: inherit;
+        }
+
+  /* ============================================================
+   MASKANWA FORM SYSTEM
+   ============================================================ */
+
+main form {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+main form > div,
+main form > p {
+    margin-bottom: 1.25rem;
+}
+
+main form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+main form input,
+main form select,
+main form textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    outline: none;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+main form textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+main form select {
+    cursor: pointer;
+}
+
+main form input:focus,
+main form select:focus,
+main form textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+main form input::placeholder,
+main form textarea::placeholder {
+    color: #94a3b8;
+}
+
+main form button,
+main form input[type="submit"] {
+    display: inline-block;
+    width: auto;
+    padding: 0.8rem 1.5rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        transform 0.15s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+main form button:hover,
+main form input[type="submit"]:hover {
+    background: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+main form button:active,
+main form input[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* Checkboxes and radio buttons should not become full-width */
+main form input[type="checkbox"],
+main form input[type="radio"] {
+    display: inline-block;
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    main form {
+        padding: 1.25rem;
+    }
+
+    main form input,
+    main form select,
+    main form textarea {
+        font-size: 1rem;
+    }
+}
+
+        /* ---------------------------------
+           Details / Summary
+        --------------------------------- */
+
+        main details {
+            margin: 1rem 0;
+            padding: 1rem;
+
+            background: var(--surface);
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        main summary {
+            cursor: pointer;
+            font-weight: 650;
+        }
+
+        /* ---------------------------------
+           Galleries / Sliders
+        --------------------------------- */
+
+        .maskanwa-gallery,
+        .gallery {
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(180px, 1fr));
+
+            gap: 1rem;
+
+            margin: 2rem 0;
+        }
+
+        .maskanwa-gallery img,
+        .gallery img {
+            width: 100%;
+            height: 100%;
+            min-height: 160px;
+
+            object-fit: cover;
+        }
+
+        .maskanwa-slider,
+        .slider {
+            display: flex;
+
+            gap: 1rem;
+
+            margin: 2rem 0;
+
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+
+            padding-bottom: 0.5rem;
+        }
+
+        .maskanwa-slide,
+        .slide {
+            flex: 0 0 min(90%, 700px);
+
+            scroll-snap-align: start;
+        }
+
+        .maskanwa-slide img,
+        .slide img {
+            width: 100%;
+        }
+
+        /* ---------------------------------
+           Horizontal rules / marks
+        --------------------------------- */
+
+        main hr {
+            margin: 2.5rem 0;
+            border: 0;
+            border-top: 1px solid var(--border);
+        }
+
+        main mark {
+            padding: 0.1rem 0.25rem;
+            border-radius: 3px;
+        }
+
+        main kbd {
+            padding: 0.15rem 0.35rem;
+
+            background: var(--surface-strong);
+
+            border: 1px solid #cbd5e1;
+            border-bottom-width: 2px;
+            border-radius: 4px;
+
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        /* ---------------------------------
+           Footer
+        --------------------------------- */
+
+        footer {
+            padding: 2.5rem 1.5rem;
+
+            text-align: center;
+
+            color: var(--text-muted);
+            background: var(--surface);
+
+            border-top: 1px solid var(--border);
+
+            font-size: 0.92rem;
+        }
+
+        footer p {
+            margin: 0;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .update-badge {
+            display: inline-block;
+
+            margin-top: 1rem;
+            padding: 0.25rem 0.7rem;
+
+            background: #fff;
+
+            border: 1px solid var(--border);
+            border-radius: 6px;
+
+            color: #94a3b8;
+
+            font-family: ui-monospace, monospace;
+            font-size: 0.8rem;
+        }
+
+        /* ---------------------------------
+           Mobile
+        --------------------------------- */
+
+        @media (max-width: 640px) {
+
+            .header-inner {
+                padding: 0.9rem 1rem;
+            }
+
+            .header-inner nav {
+                gap: 0.65rem;
+            }
+
+            nav a {
+                font-size: 0.88rem;
+            }
+
+            main {
+                padding: 2rem 1rem 3rem;
+            }
+
+            main p,
+            main ul,
+            main ol {
+                font-size: 1rem;
+            }
+
+            main h1 {
+                font-size: 2rem;
+            }
+
+            main h2 {
+                font-size: 1.45rem;
+            }
+
+            main form {
+                padding: 1rem;
+            }
+
+            main > iframe {
+                min-height: 300px;
+            }
+
+            .maskanwa-gallery,
+            .gallery {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        /* ---------------------------------
+           Reduced motion
+        --------------------------------- */
+
+        @media (prefers-reduced-motion: reduce) {
+
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="header-inner">
+
+        <a href="/" class="brand">
+            <%= site.name || 'Maskanwa' %>
+        </a>
+
+        <nav aria-label="Primary navigation">
+            <a href="/">Home</a>
+        </nav>
+
+    </div>
+</header>
+
+<main>
+    <%- content %>
+</main>
+
+<footer>
+
+    <p>
+        &copy; <%= new Date().getFullYear() %>
+        <%= site.name || 'Maskanwa' %>.
+
+        <br>
+
+        Powered by
+        <a href="https://maskanwa.com">
+            Maskanwa
+        </a>
+    </p>
+
+    <div class="update-badge">
+        Updated: <%= buildTime %>
+    </div>
+
+</footer>
+
+</body>
+</html>
