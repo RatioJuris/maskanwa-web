@@ -34,7 +34,6 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const rawHtml = marked.parse(markdownBody);
     const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
     
-    // Clean URL resolution
     const isIndex = file === 'site.md';
     const pageSlug = isIndex ? '' : file.replace('.md', '');
     const canonicalUrl = isShowcase 
@@ -48,7 +47,7 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
       page: { title: pageTitle, canonical: canonicalUrl, ...frontmatter },
       content: cleanHtml,
       slug: slug,
-      institutions: allInstitutions // Only used by showcase
+      institutions: allInstitutions
     });
 
     const outputPath = isIndex 
@@ -58,7 +57,6 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     await fs.outputFile(outputPath, renderedPage);
   }
 
-  // Copy Assets
   const assetsPath = path.join(instPath, 'assets');
   if (fs.existsSync(assetsPath)) {
     await fs.copy(assetsPath, path.join(distInstPath, 'assets'));
@@ -70,18 +68,17 @@ async function buildPlatform() {
   await fs.emptyDir(DIST_DIR);
   const manifest = await fs.readJson(MANIFEST_PATH);
 
-  // 1. Build Platform Showcase (/public/www/)
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
   await buildContent('www', manifest.platform, true, allInstitutions);
 
-  // 2. Build Institution Tenants (/public/<slug>/)
   for (const slug of Object.keys(manifest.sites)) {
     console.log(`Building Institution: ${slug}...`);
     await buildContent(slug, manifest.sites[slug], false);
   }
 
-  // 3. Platform-wide 404
+  await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
+
   await fs.outputFile(path.join(DIST_DIR, '404.html'), `
     <!DOCTYPE html>
     <html lang="en">
