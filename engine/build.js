@@ -12,9 +12,8 @@ const DIST_DIR = path.resolve(__dirname, '../dist');
 const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
 const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
-// Hardened HTML Sanitization rules supporting secure interactive forms
 const sanitizeOptions = {
-  // 1. Explicitly allow tags needed for the onboarding form
+  // 1. Explicitly list allowed tags including forms
   allowedTags: [
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
     'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
@@ -22,22 +21,22 @@ const sanitizeOptions = {
     'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
   ],
 
-  // 2. Attribute-level locking (Strict isolation)
+  // 2. Strict attribute isolation to protect forms
   allowedAttributes: {
     'a': ['href', 'name', 'target', 'title'],
     'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
     'iframe': ['src', 'width', 'height', 'title'],
-    'form': ['id', 'class', 'method'], // Action is intentionally handled in JS transformation
+    'form': ['id', 'class', 'method'], // Action omitted; we intercept via JS
     'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
     'select': ['id', 'name', 'required', 'class'],
     'option': ['value', 'selected'],
     'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
     'button': ['type', 'id', 'class'],
     'label': ['for', 'class'],
-    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global attributes
+    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global parameters
   },
 
-  // 3. URI Scheme Isolation
+  // 3. Strict URI Scheme Enforcement
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: {
     'a': ['https', 'mailto', 'tel'],
@@ -46,21 +45,21 @@ const sanitizeOptions = {
   },
   allowProtocolRelative: false,
 
-  // 4. Advanced heuristics and Anti-Phishing blocks
+  // 4. Content Traversal Filters for Advanced Heuristics
   exclusiveFilter: (frame) => {
-    // Block forms or elements with dynamic formaction hooks
+    // Attack Block: Drop buttons or inputs executing cross-domain actions
     if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
       return true;
     }
 
-    // Force all forms to process locally or only via verified platform channels
+    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
     if (frame.tag === 'form' && frame.attribs.action) {
       const isRelative = !frame.attribs.action.includes('://');
       const isInternal = frame.attribs.action.startsWith('https://maskanwa.com');
       if (!isRelative && !isInternal) return true;
     }
 
-    // Clean up empty placeholder markup vectors
+    // Empty Node Cleanup
     if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
       return true;
     }
@@ -68,7 +67,7 @@ const sanitizeOptions = {
     return false;
   },
 
-  // 5. Node Transformations and security adjustments
+  // 5. Node Transformations and Security Hardening
   transformTags: {
     'a': (tagName, attribs) => {
       if (attribs.target === '_blank') {
@@ -88,6 +87,7 @@ const sanitizeOptions = {
     }
   },
 
+  // 6. Security Boundaries
   allowVulnerableTags: false,
   stripHtmlByRegexp: /<!--[\s\S]*?-->/g
 };
@@ -96,6 +96,7 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
   const instPath = path.join(PUBLIC_DIR, slug);
   const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
 
+  if (!fs.existsSync(instPath)) return;
   const files = await fs.readdir(instPath);
   const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.MD'));
 
@@ -111,6 +112,7 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
 
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
+
     const canonicalUrl = isShowcase
       ? `https://maskanwa.com/${pageSlug}`
       : `https://${slug}.maskanwa.com/${pageSlug}`;
@@ -142,15 +144,18 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
 async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
+
+  // Write CNAME file at the root of ./dist to map to maskanwa.com
+  await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
+  console.log('[SUCCESS] CNAME file written for domain mapping.');
+
   const manifest = await fs.readJson(MANIFEST_PATH);
 
-  // Dynamic Build Time stamp synced to Asia/Kolkata (IST)
   const buildTime = new Date().toLocaleString('en-IN', {
     timeZone: 'Asia/Kolkata',
     dateStyle: 'medium',
     timeStyle: 'short'
   });
-
   console.log(`Build Time: ${buildTime}`);
 
   console.log('Building Showcase (www)...');
@@ -164,7 +169,6 @@ async function buildPlatform() {
 
   await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-  // Build modern 404 handler
   await fs.outputFile(path.join(DIST_DIR, '404.html'), `
     <!DOCTYPE html>
     <html lang="en">
@@ -183,8 +187,8 @@ async function buildPlatform() {
     <body>
       <div class="card">
         <h1>404</h1>
-        <h2>Entity Not Found</h2>
-        <p>The requested Maskanwa network resource does not exist.</p>\n        <a href="https://maskanwa.com">Return to Maskanwa.com</a>
+        <h2>Entity Not Found</h2>\n        <p>The requested Maskanwa network resource does not exist.</p>
+        <a href="https://maskanwa.com">Return to Directory</a>
       </div>
     </body>
     </html>
