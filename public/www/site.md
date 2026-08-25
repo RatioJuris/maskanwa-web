@@ -1,7 +1,7 @@
 ---
 name: Maskanwa
 type: platform
-description: "From Maskanwa Bazar to the World: Ab Har Vyapaar Chamki!"
+description: From Maskanwa Bazar to the World, Ab Har Vyapaar Chamki!, Zero-Friction Hosting, Local Trust Kyunki Apna Maskanwa Hai Sabse Khaas!
 ---
 
 <!-- Native Pico CSS Grid for the Core Features -->
