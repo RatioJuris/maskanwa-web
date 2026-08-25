@@ -58,7 +58,7 @@ async function validateAndGenerateManifest() {
     manifest.sites[slug] = {
       slug: slug,
       name: frontmatter.name || slug,
-      type: frontmatter.type || 'local entity',
+      type: frontmatter.type || 'Local Entity',
       domain: `${slug}.maskanwa.com`,
       path: `/public/${slug}/`
     };
