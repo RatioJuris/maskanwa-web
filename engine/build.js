@@ -12,14 +12,139 @@ const DIST_DIR = path.resolve(__dirname, '../dist');
 const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
 const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
+const PLATFORM_SLUG = 'www';
+const SAFE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
+/*
+ *  ============================================================
+ *  SAFE FILESYSTEM RESOLUTION
+ *  ============================================================
+ */
+function resolveInside(baseDir, relativePath) {
+  if (typeof relativePath !== 'string' || !relativePath) {
+    throw new Error(`Unsafe filesystem path detected: ${relativePath}`);
+  }
+  const resolved = path.resolve(baseDir, relativePath);
+  if (!resolved.startsWith(baseDir)) {
+    throw new Error(`Path traversal attempt detected: ${relativePath}`);
+  }
+  return resolved;
+}
+
+function resolvePlatformSource() {
+  return resolveInside(PUBLIC_DIR, PLATFORM_SLUG);
+}
+
+function resolveTenantSource(slug) {
+  if (typeof slug !== 'string' || !SAFE_SLUG_PATTERN.test(slug) || slug.toLowerCase() === PLATFORM_SLUG) {
+    throw new Error(`Unsafe tenant slug detected: ${slug}`);
+  }
+  return resolveInside(PUBLIC_DIR, slug);
+}
+
+function resolveTenantOutput(slug) {
+  if (typeof slug !== 'string' || !SAFE_SLUG_PATTERN.test(slug)) {
+    throw new Error(`Unsafe tenant output slug detected: ${slug}`);
+  }
+  return resolveInside(DIST_DIR, slug);
+}
+
+/*
+ *  ============================================================
+ *  HTML SANITIZATION
+ *  ============================================================
+ *  Markdown may contain useful HTML such as:
+ *  forms, video, audio, iframe / YouTube, tables, details / summary, semantic HTML
+ *  Dangerous scripting remains prohibited.
+ */
 const sanitizeOptions = {
-  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'h3', 'h4', 'span', 'div', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td']),
-  allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, 'img': ['src', 'alt', 'loading'], 'a': ['href', 'target', 'rel'] }
+  // 1. Explicitly list allowed tags
+  allowedTags: [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
+    'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
+    'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe',
+    'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
+  ],
+
+  // 2. Strict attribute isolation
+  allowedAttributes: {
+    'a': ['href', 'name', 'target', 'title'],
+    'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
+    'iframe': ['src', 'width', 'height', 'title'],
+    'form': ['id', 'class', 'method'], // action intentionally removed
+    'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
+    'select': ['id', 'name', 'required', 'class'],
+    'option': ['value', 'selected'],
+    'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
+    'button': ['type', 'id', 'class'],
+    'label': ['for', 'class'],
+    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global attributes
+  },
+
+  // 3. Strict URI Scheme Enforcement
+  allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+  allowedSchemesByTag: {
+    'a': ['https', 'mailto', 'tel'],
+    'img': ['https', 'data'],
+    'iframe': ['https']
+  },
+  allowProtocolRelative: false,
+
+  // 4. Content Traversal Filters for Advanced Heuristics
+  exclusiveFilter: (frame) => {
+    // Attack Block: Drop buttons or inputs executing cross-domain actions
+    if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
+      return true;
+    }
+
+    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
+    if (frame.tag === 'form' && frame.attribs.action) {
+      const isRelative = !frame.attribs.action.includes('://');
+      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com');
+      if (!isRelative && !isInternal) return true;
+    }
+
+    // Empty Node Cleanup
+    if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
+      return true;
+    }
+
+    return false;
+  },
+
+  // 5. Node Transformations and Security Hardening
+  transformTags: {
+    'a': (tagName, attribs) => {
+      if (attribs.target === '_blank') {
+        attribs.rel = attribs.rel
+          ? [...new Set([...attribs.rel.split(' '), 'noopener', 'noreferrer'])].join(' ')
+          : 'noopener noreferrer';
+      }
+      return { tagName, attribs };
+    },
+    'form': (tagName, attribs) => {
+      attribs.method = (attribs.method || 'POST').toUpperCase();
+      return { tagName, attribs };
+    },
+    'iframe': (tagName, attribs) => {
+      attribs.sandbox = 'allow-scripts allow-same-origin';
+      return { tagName, attribs };
+    }
+  },
+
+  // 6. Security Boundaries
+  allowVulnerableTags: false,
+  stripHtmlByRegexp: /<!--[\s\S]*?-->/g
 };
 
+/*
+ *  ============================================================
+ *  BUILD CONTENT
+ *  ============================================================
+ */
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
-  const instPath = path.join(PUBLIC_DIR, slug);
-  const distInstPath = path.join(DIST_DIR, slug);
+  const instPath = isShowcase ? resolvePlatformSource() : resolveTenantSource(slug);
+  const distInstPath = isShowcase ? resolveInside(DIST_DIR, PLATFORM_SLUG) : resolveTenantOutput(slug);
   
   const files = await fs.readdir(instPath);
   const markdownFiles = files.filter(f => f.endsWith('.md'));
@@ -64,12 +189,16 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
   }
 }
 
+/*
+ *  ============================================================
+ *  PLATFORM BUILD
+ *  ============================================================
+ */
 async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
   const manifest = await fs.readJson(MANIFEST_PATH);
   
-  // Format the exact build time for IST
   const buildTime = new Date().toLocaleString('en-IN', { 
     timeZone: 'Asia/Kolkata', 
     dateStyle: 'medium', 
@@ -80,7 +209,7 @@ async function buildPlatform() {
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
-  await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
+  await buildContent(PLATFORM_SLUG, manifest.platform, true, allInstitutions, buildTime);
 
   for (const slug of Object.keys(manifest.sites)) {
     console.log(`Building Tenant: ${slug}...`);
@@ -118,7 +247,12 @@ async function buildPlatform() {
   console.log('[SUCCESS] Platform successfully built to /dist');
 }
 
-buildPlatform().catch(err => {
-  console.error('[BUILD ERROR]', err);
+/*
+ *  ============================================================
+ *  START BUILD
+ *  ============================================================
+ */
+buildPlatform().catch(error => {
+  console.error('[BUILD ERROR]', error);
   process.exit(1);
 });
