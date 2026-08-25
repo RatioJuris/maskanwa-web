@@ -55,9 +55,16 @@
         .brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: -0.02em; }
         nav a { margin-left: 2rem; color: var(--text-muted); text-decoration: none; font-weight: 500; transition: color 0.2s; font-size: 0.95rem; }
         nav a:hover { color: var(--primary); }
+        
+        /* Hero & Typewriter Animation */
         .hero { padding: 6rem 2rem; text-align: center; background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%); border-bottom: 1px solid var(--border); }
         .hero h1 { font-size: 3.5rem; font-weight: 800; margin: 0 0 1rem 0; letter-spacing: -0.04em; color: var(--primary); line-height: 1.1; }
-        .hero p { font-size: 1.25rem; color: var(--text-muted); max-width: 600px; margin: 0 auto; }
+        .typing-container { min-height: 4rem; display: flex; justify-content: center; align-items: center; }
+        .typing-text { font-size: 2.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.04em; }
+        .dynamic-word { color: var(--accent); position: relative; }
+        .dynamic-word::after { content: '|'; position: absolute; right: -12px; animation: blink 1s step-end infinite; color: var(--primary); }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
         main { max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; min-height: 50vh; }
         main h2 { font-size: 2rem; font-weight: 700; margin-top: 0; letter-spacing: -0.03em; }
         main h3 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; }
@@ -65,13 +72,8 @@
         main a { color: var(--accent); text-decoration: none; }
         main a:hover { text-decoration: underline; }
 
-        /* Future-Proofing: Media, Embedded Video, and Sliders */
+        /* Future-Proofing: Media & Scroll Animations */
         img, picture, video, iframe, figure { max-width: 100%; height: auto; display: block; border-radius: 12px; }
-        .aspect-video { aspect-ratio: 16 / 9; width: 100%; object-fit: cover; }
-        .css-slider { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 1rem; padding-bottom: 1rem; scrollbar-width: thin; }
-        .css-slider > * { scroll-snap-align: start; flex: 0 0 85%; }
-        
-        /* Future-Proofing: Scroll Animations */
         .fade-in-up { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
         .fade-in-up.visible { opacity: 1; transform: translateY(0); }
 
@@ -108,6 +110,8 @@
         
         @media (max-width: 600px) {
             .hero h1 { font-size: 2.5rem; }
+            .typing-text { font-size: 1.6rem; }
+            .typing-container { min-height: 5rem; }
             nav a { margin-left: 1rem; }
             .join-form { padding: 1.5rem; }
         }
@@ -127,19 +131,24 @@
 
     <% if (page.title === site.name) { %>
     <div class="hero">
-        <h1 class="fade-in-up"><%= site.name %></h1>
-        <p class="fade-in-up" style="transition-delay: 100ms;"><%= page.description || "The digital directory for Maskanwa." %></p>
+        <h1 class="fade-in-up"><%= site.name %><span style="color: var(--accent);">.com</span></h1>
+        <div class="typing-container fade-in-up" style="transition-delay: 100ms;">
+            <div class="typing-text">Kya Aapka <span id="typewriter" class="dynamic-word">School</span> Yahan Hai?</div>
+        </div>
+        <p class="fade-in-up" style="transition-delay: 200ms; margin-top: 1rem;"><%= page.description %></p>
+        <div class="fade-in-up" style="transition-delay: 300ms; margin-top: 2rem;">
+            <a href="https://maskanwa.com/join" style="background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 99px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">Join the Network - It's Free</a>
+        </div>
     </div>
     <% } %>
     
     <main>
-        <!-- Injected Markdown Content -->
         <div class="content-wrapper fade-in-up">
             <%- content %>
         </div>
         
         <% if (page.title === site.name) { %>
-        <h2 style="margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 3rem; text-align: center;" class="fade-in-up">Explore Maskanwa</h2>
+        <h2 style="margin-top: 4rem; border-top: 1px solid var(--border); padding-top: 3rem; text-align: center;" class="fade-in-up">Explore Maskanwa</h2>
         
         <div class="controls fade-in-up">
             <div class="search-bar">
@@ -180,7 +189,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 1. Future-Proofing: Scroll Animations
+            // 1. Scroll Animations Observer
             const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
             const observer = new IntersectionObserver((entries, obs) => {
                 entries.forEach(entry => {
@@ -192,7 +201,41 @@
             }, observerOptions);
             document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
 
-            // 2. Directory Search & Filtering Logic
+            // 2. Typewriter Effect
+            const typewriterElement = document.getElementById('typewriter');
+            if (typewriterElement) {
+                const words = ["School", "College", "Clinic", "Kirana Store", "Coaching", "Hospital", "Business"];
+                let wordIndex = 0;
+                let charIndex = 0;
+                let isDeleting = false;
+                
+                function type() {
+                    const currentWord = words[wordIndex];
+                    if (isDeleting) {
+                        typewriterElement.textContent = currentWord.substring(0, charIndex - 1);
+                        charIndex--;
+                    } else {
+                        typewriterElement.textContent = currentWord.substring(0, charIndex + 1);
+                        charIndex++;
+                    }
+
+                    let typeSpeed = isDeleting ? 50 : 100;
+
+                    if (!isDeleting && charIndex === currentWord.length) {
+                        typeSpeed = 2000;
+                        isDeleting = true;
+                    } else if (isDeleting && charIndex === 0) {
+                        isDeleting = false;
+                        wordIndex = (wordIndex + 1) % words.length;
+                        typeSpeed = 500;
+                    }
+                    setTimeout(type, typeSpeed);
+                }
+                typewriterElement.textContent = "";
+                type();
+            }
+
+            // 3. Search & Filtering Logic
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 const filterBtns = document.querySelectorAll('.filter-btn');
@@ -232,7 +275,7 @@
                 });
             }
 
-            // 3. Join Form Logic (Redirects to GitHub securely)
+            // 4. Join Form GitHub Redirect Logic
             const joinBtn = document.getElementById('joinBtn');
             if (joinBtn) {
                 joinBtn.addEventListener('click', function() {
