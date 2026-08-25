@@ -113,13 +113,13 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
     
+    // Fixed string interpolation logic for canonical URLs
     const canonicalUrl = isShowcase 
       ? `https://maskanwa.com/${pageSlug}` 
       : `https://${slug}.maskanwa.com/${pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
     
-    // Create the JSON-LD schema payload to satisfy the template
     const jsonLdPayload = {
       "@context": "https://schema.org",
       "@type": "WebSite",
