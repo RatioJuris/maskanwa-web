@@ -1,4 +1,4 @@
-name: Maskanwa Web CI/CD
+name: Maskanwa CI/CD
 
 on:
   push:
@@ -25,12 +25,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Validate Institutions & Generate Manifest
+      - name: Validate Tenants & Generate Manifest
         run: npm run validate
 
       - name: Build Platform Engine
