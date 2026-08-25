@@ -87,14 +87,15 @@ const sanitizeOptions = {
     }
   },
 
-  // 6. Security Boundaries (Fixed broken regex syntax from //g)
+  // 6. Security Boundaries (Fixed valid RegExp instead of empty //g)
   allowVulnerableTags: false,
   stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
 };
 
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
   const instPath = path.join(PUBLIC_DIR, slug);
-  const distInstPath = path.join(DIST_DIR, slug); // Treat showcase 'www' and tenants uniformly as subdirectories so Cloudflare Worker maps them correctly
+  // UNIFORM PATH: Treat 'www' and tenants the same so worker matches /www/ and /{slug}/ folders
+  const distInstPath = path.join(DIST_DIR, slug);
   
   if (!fs.existsSync(instPath)) return;
   const files = await fs.readdir(instPath);
@@ -113,14 +114,14 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
     
-    // Fixed string interpolation template literals
+    // Corrected string interpolation syntax
     const canonicalUrl = isShowcase 
       ? `https://maskanwa.com/${pageSlug}` 
       : `https://${slug}.maskanwa.com/${pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
     
-    // Provided structuredData payload to fix the template crash
+    // Provide structuredData to satisfy layout.ejs
     const jsonLdPayload = {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -171,8 +172,7 @@ async function buildPlatform() {
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
-  
-  // Build 'www' into dist/www/ so Cloudflare worker finds it for maskanwa.com and www.maskanwa.com
+  // Now builds into dist/www/ matching how Cloudflare worker expects subfolder routing
   await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
   for (const slug of Object.keys(manifest.sites)) {
@@ -182,7 +182,7 @@ async function buildPlatform() {
 
   await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-  const errorPageHtml = `
+  await fs.outputFile(path.join(DIST_DIR, '404.html'), `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -206,9 +206,7 @@ async function buildPlatform() {
       </div>
     </body>
     </html>
-  `;
-
-  await fs.outputFile(path.join(DIST_DIR, '404.html'), errorPageHtml);
+  `);
 
   console.log('[SUCCESS] Platform successfully built to /dist');
 }
