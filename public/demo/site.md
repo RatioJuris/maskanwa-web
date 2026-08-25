@@ -34,4 +34,4 @@ Bina kuanon jhanjhat ke aapka rashan pack milega!
 --------------------------------------------------------------------------------
 🚀 Aisan Hi Page Aapki Kirana Dukaan Ka Bhi Bani!
 Put your grocery shop online today with zero technical friction.
-[Bina Jhanjhat Page Banawa • Forever Free]([url](https://maskanwa.com/join))
+[Bina Jhanjhat Page Banawa • Forever Free](https://maskanwa.com/join)
