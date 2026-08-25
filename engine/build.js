@@ -23,17 +23,17 @@ const sanitizeOptions = {
 
   // 2. Strict attribute isolation to protect forms
   allowedAttributes: {
-    'a': ['href', 'name', 'target', 'title'],
+    'a': ['href', 'name', 'target', 'title', 'rel'],
     'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
-    'iframe': ['src', 'width', 'height', 'title'],
-    'form': ['id', 'class', 'method'], // Action omitted; we intercept via JS
+    'iframe': ['src', 'width', 'height', 'title', 'sandbox'],
+    'form': ['id', 'class', 'method', 'action'], 
     'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
     'select': ['id', 'name', 'required', 'class'],
     'option': ['value', 'selected'],
     'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
     'button': ['type', 'id', 'class'],
     'label': ['for', 'class'],
-    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global parameters
+    '*': ['id', 'class']
   },
 
   // 3. Strict URI Scheme Enforcement
@@ -45,29 +45,7 @@ const sanitizeOptions = {
   },
   allowProtocolRelative: false,
 
-  // 4. Content Traversal Filters for Advanced Heuristics
-  exclusiveFilter: (frame) => {
-    // Attack Block: Drop buttons or inputs executing cross-domain actions
-    if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
-      return true;
-    }
-
-    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
-    if (frame.tag === 'form' && frame.attribs.action) {
-      const isRelative = !frame.attribs.action.includes('://');
-      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com');
-      if (!isRelative && !isInternal) return true;
-    }
-
-    // Empty Node Cleanup
-    if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
-      return true;
-    }
-
-    return false;
-  },
-
-  // 5. Node Transformations and Security Hardening
+  // 4. Node Transformations and Security Hardening
   transformTags: {
     'a': (tagName, attribs) => {
       if (attribs.target === '_blank') {
@@ -79,6 +57,14 @@ const sanitizeOptions = {
     },
     'form': (tagName, attribs) => {
       attribs.method = (attribs.method || 'POST').toUpperCase();
+      // Ensure safe action routing if action is specified externally
+      if (attribs.action) {
+        const isRelative = !attribs.action.includes('://');
+        const isInternal = attribs.action.startsWith('https://maskanwa.com');
+        if (!isRelative && !isInternal) {
+          delete attribs.action;
+        }
+      }
       return { tagName, attribs };
     },
     'iframe': (tagName, attribs) => {
@@ -87,9 +73,7 @@ const sanitizeOptions = {
     }
   },
 
-  // 6. Security Boundaries
-  allowVulnerableTags: false,
-  stripHtmlByRegexp: /<!--[\s\S]*?-->/g
+  allowVulnerableTags: false
 };
 
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
@@ -114,12 +98,11 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
 
     const canonicalUrl = isShowcase
-      ? `https://maskanwa.com{pageSlug}`
-      : `https://${slug}://{pageSlug}`;
+      ? `https://maskanwa.com/${pageSlug}`
+      : `https://${slug}.maskanwa.com/${pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
 
-    // Create the JSON-LD schema payload to resolve the template logic error
     const jsonLdPayload = {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -163,7 +146,6 @@ async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
 
-  // Write CNAME file at the root of ./dist to map to maskanwa.com
   await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
   console.log('[SUCCESS] CNAME file written for domain mapping.');
 
