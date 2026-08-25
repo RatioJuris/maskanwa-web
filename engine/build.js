@@ -160,7 +160,27 @@ async function buildPlatform() {
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
+  
+  // 1. Build showcase to root dist/ for maskanwa.com
   await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
+
+  // 2. Mirror showcase build into dist/www/ so www.maskanwa.com resolves correctly if routed via subfolder
+  const distWwwPath = path.join(DIST_DIR, 'www');
+  await fs.ensureDir(distWwwPath);
+  for (const item of await fs.readdir(DIST_DIR)) {
+    if (item === 'www' || item === 'manifest.json' || item === 'CNAME') continue;
+    const srcPath = path.join(DIST_DIR, item);
+    const destPath = path.join(distWwwPath, item);
+    if ((await fs.stat(srcPath)).isDirectory()) {
+      await fs.copy(srcPath, destPath);
+    } else {
+      await fs.copy(srcPath, destPath);
+    }
+  }
+  // Also copy index.html and 404.html to dist/www/
+  if (fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
+    await fs.copy(path.join(DIST_DIR, 'index.html'), path.join(distWwwPath, 'index.html'));
+  }
 
   for (const slug of Object.keys(manifest.sites)) {
     console.log(`Building Tenant: ${slug}...`);
@@ -169,7 +189,7 @@ async function buildPlatform() {
 
   await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-  await fs.outputFile(path.join(DIST_DIR, '404.html'), `
+  const errorPageHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -193,7 +213,12 @@ async function buildPlatform() {
       </div>
     </body>
     </html>
-  `);
+  `;
+
+  await fs.outputFile(path.join(DIST_DIR, '404.html'), errorPageHtml);
+  if (fs.existsSync(distWwwPath)) {
+    await fs.outputFile(path.join(distWwwPath, '404.html'), errorPageHtml);
+  }
 
   console.log('[SUCCESS] Platform successfully built to /dist');
 }
