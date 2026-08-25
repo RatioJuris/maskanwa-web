@@ -13,30 +13,25 @@ const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
 const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
 const sanitizeOptions = {
-  // 1. Explicitly list allowed tags including forms
   allowedTags: [
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
     'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
     'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe',
     'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
   ],
-
-  // 2. Strict attribute isolation to protect forms
   allowedAttributes: {
     'a': ['href', 'name', 'target', 'title'],
     'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
     'iframe': ['src', 'width', 'height', 'title'],
-    'form': ['id', 'class', 'method'], // Action omitted; we intercept via JS
+    'form': ['id', 'class', 'method'], 
     'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
     'select': ['id', 'name', 'required', 'class'],
     'option': ['value', 'selected'],
     'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
     'button': ['type', 'id', 'class'],
     'label': ['for', 'class'],
-    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global parameters
+    '*': ['id', 'class', 'aria-*', 'data-*']
   },
-
-  // 3. Strict URI Scheme Enforcement
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: {
     'a': ['https', 'mailto', 'tel'], 
@@ -44,30 +39,20 @@ const sanitizeOptions = {
     'iframe': ['https']              
   },
   allowProtocolRelative: false,
-
-  // 4. Content Traversal Filters for Advanced Heuristics
   exclusiveFilter: (frame) => {
-    // Attack Block: Drop buttons or inputs executing cross-domain actions
     if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
       return true;
     }
-
-    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
     if (frame.tag === 'form' && frame.attribs.action) {
       const isRelative = !frame.attribs.action.includes('://');
       const isInternal = frame.attribs.action.startsWith('https://maskanwa.com'); 
       if (!isRelative && !isInternal) return true; 
     }
-
-    // Empty Node Cleanup
     if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
       return true;
     }
-
     return false;
   },
-
-  // 5. Node Transformations and Security Hardening
   transformTags: {
     'a': (tagName, attribs) => {
       if (attribs.target === '_blank') {
@@ -86,15 +71,14 @@ const sanitizeOptions = {
       return { tagName, attribs };
     }
   },
-
-  // 6. Security Boundaries
   allowVulnerableTags: false,
   stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
 };
 
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
   const instPath = path.join(PUBLIC_DIR, slug);
-  const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
+  // TREAT 'www' EXACTLY LIKE TENANTS SO IT BUILDS INTO dist/www/
+  const distInstPath = path.join(DIST_DIR, slug);
   
   if (!fs.existsSync(instPath)) return;
   const files = await fs.readdir(instPath);
@@ -113,7 +97,6 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
     
-    // Fixed string interpolation logic for canonical URLs
     const canonicalUrl = isShowcase 
       ? `https://maskanwa.com/${pageSlug}` 
       : `https://${slug}.maskanwa.com/${pageSlug}`;
@@ -155,7 +138,6 @@ async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
   
-  // Write CNAME file at the root of ./dist to map to maskanwa.com
   await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
   console.log('[SUCCESS] CNAME file written for domain mapping.');
 
@@ -170,6 +152,8 @@ async function buildPlatform() {
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
+  
+  // Build 'www' into dist/www/ just like all other tenants
   await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
   for (const slug of Object.keys(manifest.sites)) {
@@ -179,7 +163,7 @@ async function buildPlatform() {
 
   await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-  await fs.outputFile(path.join(DIST_DIR, '404.html'), `
+  const errorPageHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -203,7 +187,9 @@ async function buildPlatform() {
       </div>
     </body>
     </html>
-  `);
+  `;
+
+  await fs.outputFile(path.join(DIST_DIR, '404.html'), errorPageHtml);
 
   console.log('[SUCCESS] Platform successfully built to /dist');
 }
