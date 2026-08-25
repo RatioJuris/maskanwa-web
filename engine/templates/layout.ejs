@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,11 +40,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ... Keep your existing CSS styles below this point ... */
         :root { --primary: #0f172a; --accent: #2563eb; --bg: #ffffff; --surface: #f8fafc; --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0; }
         * { box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text-main); line-height: 1.7; -webkit-font-smoothing: antialiased; }
-        header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+        header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 100; }
         .header-inner { max-width: 800px; margin: 0 auto; padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; }
         .brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: -0.02em; }
         nav a { margin-left: 1.5rem; color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 0.95rem; }
@@ -66,3 +67,21 @@
         .update-badge { display: inline-block; margin-top: 1rem; padding: 0.25rem 0.75rem; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-family: monospace; color: #94a3b8; }
     </style>
 </head>
+<body>
+    <header>
+        <div class="header-inner">
+            <a href="/" class="brand"><%= site.name %></a>
+            <nav>
+                <a href="/">Home</a>
+            </nav>
+        </div>
+    </header>
+    <main>
+        <%- content %>
+    </main>
+    <footer>
+        <p>&copy; <%= new Date().getFullYear() %> <%= site.name %>.<br>Powered by <a href="https://maskanwa.com">Maskanwa</a></p>
+        <div class="update-badge">Updated: <%= buildTime %></div>
+    </footer>
+</body>
+</html>
