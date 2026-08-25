@@ -93,7 +93,7 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const rawHtml = marked.parse(markdownBody);
     const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
 
-    // Only 'site.md' serves as the root/index page
+    // Strictly use 'site.md' as the index / home page
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
 
