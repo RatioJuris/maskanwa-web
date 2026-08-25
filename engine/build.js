@@ -13,15 +13,12 @@ const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
 const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
 const sanitizeOptions = {
-  // 1. Explicitly list allowed tags including forms
   allowedTags: [
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
     'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
     'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe',
     'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
   ],
-
-  // 2. Strict attribute isolation to protect forms
   allowedAttributes: {
     'a': ['href', 'name', 'target', 'title', 'rel'],
     'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
@@ -35,8 +32,6 @@ const sanitizeOptions = {
     'label': ['for', 'class'],
     '*': ['id', 'class']
   },
-
-  // 3. Strict URI Scheme Enforcement
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: {
     'a': ['https', 'mailto', 'tel'],
@@ -44,8 +39,6 @@ const sanitizeOptions = {
     'iframe': ['https']  
   },
   allowProtocolRelative: false,
-
-  // 4. Node Transformations and Security Hardening
   transformTags: {
     'a': (tagName, attribs) => {
       if (attribs.target === '_blank') {
@@ -71,7 +64,6 @@ const sanitizeOptions = {
       return { tagName, attribs };
     }
   },
-
   allowVulnerableTags: false
 };
 
@@ -93,7 +85,6 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const rawHtml = marked.parse(markdownBody);
     const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
 
-    // Strictly use 'site.md' as the index / home page
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
 
@@ -161,27 +152,10 @@ async function buildPlatform() {
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
   
-  // 1. Build showcase to root dist/ for maskanwa.com
+  // Build showcase (www) directly to root dist/
   await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
-  // 2. Mirror showcase build into dist/www/ so www.maskanwa.com resolves correctly if routed via subfolder
-  const distWwwPath = path.join(DIST_DIR, 'www');
-  await fs.ensureDir(distWwwPath);
-  for (const item of await fs.readdir(DIST_DIR)) {
-    if (item === 'www' || item === 'manifest.json' || item === 'CNAME') continue;
-    const srcPath = path.join(DIST_DIR, item);
-    const destPath = path.join(distWwwPath, item);
-    if ((await fs.stat(srcPath)).isDirectory()) {
-      await fs.copy(srcPath, destPath);
-    } else {
-      await fs.copy(srcPath, destPath);
-    }
-  }
-  // Also copy index.html and 404.html to dist/www/
-  if (fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
-    await fs.copy(path.join(DIST_DIR, 'index.html'), path.join(distWwwPath, 'index.html'));
-  }
-
+  // Build each tenant into its own subdirectory under dist/
   for (const slug of Object.keys(manifest.sites)) {
     console.log(`Building Tenant: ${slug}...`);
     await buildContent(slug, manifest.sites[slug], false, null, buildTime);
@@ -216,9 +190,6 @@ async function buildPlatform() {
   `;
 
   await fs.outputFile(path.join(DIST_DIR, '404.html'), errorPageHtml);
-  if (fs.existsSync(distWwwPath)) {
-    await fs.outputFile(path.join(distWwwPath, '404.html'), errorPageHtml);
-  }
 
   console.log('[SUCCESS] Platform successfully built to /dist');
 }
