@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Primary SEO Tags -->
-    <title><%= page.title %></title>\n    <meta name="title" content="<%= page.title %>">
+    <title><%= page.title %></title>
+    <meta name="title" content="<%= page.title %>">
     <meta name="description" content="<%= page.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.' %>">
     <link rel="canonical" href="<%= page.canonical %>">
 
@@ -121,7 +122,8 @@
         <div class="header-inner">
             <a href="https://maskanwa.com" class="brand"><%= site.name %></a>
             <nav>
-                <a href="https://maskanwa.com">Directory</a>\n                <a href="https://maskanwa.com/about">About</a>
+                <a href="https://maskanwa.com">Directory</a>
+                <a href="https://maskanwa.com/about">About</a>
                 <a href="https://maskanwa.com/join">Join</a>
             </nav>
         </div>
@@ -131,7 +133,8 @@
     <div class="hero">
         <h1 class="fade-in-up"><%= site.name %><span style="color: var(--accent);">.com</span></h1>
         <div class="typing-container fade-in-up" style="transition-delay: 100ms;">
-            <div class="typing-text">Kya Aapka <span id="typewriter" class="dynamic-word">School</span> Yahan Hai?</div>\n        </div>
+            <div class="typing-text">Kya Aapka <span id="typewriter" class="dynamic-word">School</span> Yahan Hai?</div>
+        </div>
         <p class="fade-in-up" style="transition-delay: 200ms; margin-top: 1rem;"><%= page.description %></p>
         <div class="fade-in-up" style="transition-delay: 300ms; margin-top: 2rem;">
             <a href="https://maskanwa.com/join" style="background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 99px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">Join the Network - It's Free</a>
@@ -161,12 +164,14 @@
         </div>
 
         <div class="directory" id="directoryGrid">
-            <% institutions.forEach(function(inst) { \n                let cat = "service";
+            <% institutions.forEach(function(inst) {
+                let cat = "service";
                 let t = inst.type.toLowerCase();
                 if (t.includes('school') || t.includes('college') || t.includes('institute') || t.includes('university') || t.includes('coaching')) cat = 'education';
                 else if (t.includes('store') || t.includes('shop') || t.includes('pharmacy') || t.includes('kirana')) cat = 'store';
                 else if (t.includes('hospital') || t.includes('clinic') || t.includes('pathology') || t.includes('radiologist')) cat = 'health';
-            %>\n                <a href="https://<%= inst.domain %>" class="card fade-in-up" data-category="<%= cat %>" data-search="<%= inst.name.toLowerCase() %> <%= inst.type.toLowerCase() %>">
+            %>
+                <a href="https://<%= inst.domain %>" class="card fade-in-up" data-category="<%= cat %>" data-search="<%= inst.name.toLowerCase() %> <%= inst.type.toLowerCase() %>">
                     <span class="badge"><%= inst.type %></span>
                     <h3><%= inst.name %></h3>
                     <p><%= inst.domain %></p>
@@ -290,11 +295,24 @@
 
                     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
-                    let md = `---\\nname: ${name}\\ntype: ${type}\\n---\\n# ${name}\\n\\n${desc}\\n\\n## Contact Information\\n`;
-                    if (email) md += `* **Email:** ${email}\\n`;
-                    if (phone) md += `* **Phone:** ${phone}\\n`;
-                    if (whatsapp) md += `* **WhatsApp:** [Message us on WhatsApp](https://wa.me/${whatsapp.replace(/[^0-9]/g, '')})\\n`;
-                    if (map) md += `* **Location:** [View on Google Maps](${map})\\n`;
+                    let md = `---\
+name: ${name}\
+type: ${type}\
+---\
+# ${name}\
+\
+${desc}\
+\
+## Contact Information\
+`;
+                    if (email) md += `* **Email:** ${email}\
+`;
+                    if (phone) md += `* **Phone:** ${phone}\
+`;
+                    if (whatsapp) md += `* **WhatsApp:** [Message us on WhatsApp](https://wa.me/${whatsapp.replace(/[^0-9]/g, '')})\
+`;
+                    if (map) md += `* **Location:** [View on Google Maps](${map})\
+`;
 
                     const encodedMd = encodeURIComponent(md);
                     const githubUrl = `https://github.com/RatioJuris/maskanwa-web/new/main/public?filename=${slug}/site.md&value=${encodedMd}`;
