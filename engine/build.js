@@ -73,7 +73,7 @@ async function buildPlatform() {
   await buildContent('www', manifest.platform, true, allInstitutions);
 
   for (const slug of Object.keys(manifest.sites)) {
-    console.log(`Building Institution: ${slug}...`);
+    console.log(`Building Tenant: ${slug}...`);
     await buildContent(slug, manifest.sites[slug], false);
   }
 
@@ -82,12 +82,12 @@ async function buildPlatform() {
   await fs.outputFile(path.join(DIST_DIR, '404.html'), `
     <!DOCTYPE html>
     <html lang="en">
-    <head><title>404 - Not Found | Maskanwa Web</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <head><title>404 - Not Found | Maskanwa</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
     <body style="font-family: system-ui, sans-serif; text-align: center; padding: 10% 20px; background: #f8f9fa;">
       <h1 style="color: #dc3545; font-size: 3rem; margin-bottom: 10px;">404</h1>
-      <h2>Institution Not Found</h2>
-      <p style="color: #6c757d; max-width: 500px; margin: 0 auto 30px;">The requested Maskanwa Web subdomain does not exist or the institution has been removed.</p>
-      <a href="https://maskanwa.com" style="background: #0d6efd; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Return to Maskanwa.com</a>
+      <h2>Entity Not Found</h2>
+      <p style="color: #6c757d; max-width: 500px; margin: 0 auto 30px;">The requested Maskanwa subdomain does not exist.</p>
+      <a href="https://maskanwa.com" style="background: #0d6efd; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Return to Directory</a>
     </body>
     </html>
   `);
