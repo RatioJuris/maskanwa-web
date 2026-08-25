@@ -39,9 +39,9 @@ const sanitizeOptions = {
   // 3. Strict URI Scheme Enforcement
   allowedSchemes: ['http', 'https', 'mailto', 'tel'],
   allowedSchemesByTag: {
-    'a': ['https', 'mailto', 'tel'],
-    'img': ['https', 'data'],  
-    'iframe': ['https']  
+    'a': ['https', 'mailto', 'tel'], 
+    'img': ['https', 'data'],        
+    'iframe': ['https']              
   },
   allowProtocolRelative: false,
 
@@ -55,8 +55,8 @@ const sanitizeOptions = {
     // Phishing Block: Drop forms attempting to route data to unauthorized external engines
     if (frame.tag === 'form' && frame.attribs.action) {
       const isRelative = !frame.attribs.action.includes('://');
-      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com');
-      if (!isRelative && !isInternal) return true;
+      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com'); 
+      if (!isRelative && !isInternal) return true; 
     }
 
     // Empty Node Cleanup
@@ -71,7 +71,7 @@ const sanitizeOptions = {
   transformTags: {
     'a': (tagName, attribs) => {
       if (attribs.target === '_blank') {
-        attribs.rel = attribs.rel
+        attribs.rel = attribs.rel 
           ? [...new Set([...attribs.rel.split(' '), 'noopener', 'noreferrer'])].join(' ')
           : 'noopener noreferrer';
       }
@@ -89,35 +89,44 @@ const sanitizeOptions = {
 
   // 6. Security Boundaries
   allowVulnerableTags: false,
-  stripHtmlByRegexp: /<!--[\s\S]*?-->/g
+  stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
 };
 
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
   const instPath = path.join(PUBLIC_DIR, slug);
   const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
-
+  
   if (!fs.existsSync(instPath)) return;
   const files = await fs.readdir(instPath);
   const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.MD'));
-
+  
   const templateName = isShowcase ? 'showcase.ejs' : 'layout.ejs';
   const template = await fs.readFile(path.join(TEMPLATES_DIR, templateName), 'utf-8');
 
   for (const file of markdownFiles) {
     const content = await fs.readFile(path.join(instPath, file), 'utf-8');
     const { data: frontmatter, content: markdownBody } = matter(content);
-
+    
     const rawHtml = marked.parse(markdownBody);
     const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
-
+    
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
-
-    const canonicalUrl = isShowcase
-      ? `https://maskanwa.com/${pageSlug}`
+    
+    const canonicalUrl = isShowcase 
+      ? `https://maskanwa.com/${pageSlug}` 
       : `https://${slug}.maskanwa.com/${pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
+    
+    // Create the JSON-LD schema payload to satisfy the template
+    const jsonLdPayload = {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": siteConfig.name,
+      "url": canonicalUrl,
+      "description": frontmatter.description || siteConfig.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.'
+    };
 
     const renderedPage = ejs.render(template, {
       site: siteConfig,
@@ -125,13 +134,14 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
       content: cleanHtml,
       slug: slug,
       institutions: allInstitutions,
-      buildTime: buildTime
+      buildTime: buildTime,
+      structuredData: JSON.stringify(jsonLdPayload, null, 2)
     });
 
-    const outputPath = isIndex
-      ? path.join(distInstPath, 'index.html')
+    const outputPath = isIndex 
+      ? path.join(distInstPath, 'index.html') 
       : path.join(distInstPath, pageSlug, 'index.html');
-
+      
     await fs.outputFile(outputPath, renderedPage);
   }
 
@@ -144,17 +154,17 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
 async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
-
+  
   // Write CNAME file at the root of ./dist to map to maskanwa.com
   await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
   console.log('[SUCCESS] CNAME file written for domain mapping.');
 
   const manifest = await fs.readJson(MANIFEST_PATH);
-
-  const buildTime = new Date().toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    dateStyle: 'medium',
-    timeStyle: 'short'
+  
+  const buildTime = new Date().toLocaleString('en-IN', { 
+    timeZone: 'Asia/Kolkata', 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
   });
   console.log(`Build Time: ${buildTime}`);
 
