@@ -114,10 +114,27 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
 
     const canonicalUrl = isShowcase
-      ? `https://maskanwa.com/${pageSlug}`
-      : `https://${slug}.maskanwa.com/${pageSlug}`;
+      ? `https://maskanwa.com{pageSlug}`
+      : `https://${slug}://{pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
+
+    // Create the JSON-LD schema payload to resolve the template logic error
+    const jsonLdPayload = {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": siteConfig.name,
+      "url": canonicalUrl,
+      "description": frontmatter.description || siteConfig.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.',
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": `${canonicalUrl}${canonicalUrl.endsWith('/') ? '' : '/'}search?q={search_term_string}`
+        },
+        "query-input": "required name=search_term_string"
+      }
+    };
 
     const renderedPage = ejs.render(template, {
       site: siteConfig,
@@ -125,7 +142,8 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
       content: cleanHtml,
       slug: slug,
       institutions: allInstitutions,
-      buildTime: buildTime
+      buildTime: buildTime,
+      structuredData: JSON.stringify(jsonLdPayload, null, 2)
     });
 
     const outputPath = isIndex
@@ -187,7 +205,8 @@ async function buildPlatform() {
     <body>
       <div class="card">
         <h1>404</h1>
-        <h2>Entity Not Found</h2>\n        <p>The requested Maskanwa network resource does not exist.</p>
+        <h2>Entity Not Found</h2>
+        <p>The requested Maskanwa network resource does not exist.</p>
         <a href="https://maskanwa.com">Return to Directory</a>
       </div>
     </body>
