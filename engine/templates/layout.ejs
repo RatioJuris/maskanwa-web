@@ -6,30 +6,57 @@
     <title><%= page.title %></title>
     <meta name="description" content="Official website of <%= site.name %>">
     <link rel="canonical" href="<%= page.canonical %>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; margin: 0; }
-        header { background: #1a1a1a; color: white; padding: 1.5rem 2rem; }
-        header a { color: white; text-decoration: none; font-size: 1.5rem; font-weight: bold; }
-        nav { background: #f4f4f4; padding: 0.75rem 2rem; border-bottom: 1px solid #ddd; }
-        nav a { margin-right: 1.5rem; color: #0056b3; text-decoration: none; font-weight: 500; }
-        main { padding: 2rem; max-width: 800px; margin: 0 auto; min-height: 50vh; }
-        footer { text-align: center; padding: 2rem; margin-top: 3rem; background: #f4f4f4; font-size: 0.9rem; }
-        footer a { color: #0056b3; text-decoration: none; }
+        :root { --primary: #0f172a; --accent: #2563eb; --bg: #ffffff; --surface: #f8fafc; --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text-main); line-height: 1.7; -webkit-font-smoothing: antialiased; }
+        
+        header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+        .header-inner { max-width: 800px; margin: 0 auto; padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: -0.02em; }
+        nav a { margin-left: 1.5rem; color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 0.95rem; }
+        nav a:hover { color: var(--primary); }
+
+        main { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; min-height: 60vh; }
+        
+        /* Auto-styling for Markdown elements */
+        main h1 { font-size: 2.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.03em; margin-bottom: 1.5rem; line-height: 1.2; }
+        main h2 { font-size: 1.75rem; font-weight: 600; color: var(--primary); margin-top: 2.5rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+        main h3 { font-size: 1.25rem; font-weight: 600; margin-top: 2rem; }
+        main p { font-size: 1.125rem; margin-bottom: 1.5rem; }
+        main ul, main ol { font-size: 1.125rem; margin-bottom: 1.5rem; padding-left: 1.5rem; }
+        main li { margin-bottom: 0.5rem; }
+        main a { color: var(--accent); text-decoration: none; font-weight: 500; }
+        main a:hover { text-decoration: underline; }
+        main blockquote { border-left: 4px solid var(--accent); margin: 0 0 1.5rem 0; padding: 1rem 1.5rem; background: var(--surface); border-radius: 0 8px 8px 0; color: #475569; font-style: italic; }
+        main img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        /* Table Auto-Styling */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; font-size: 1rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--surface); font-weight: 600; color: var(--primary); }
+
+        footer { border-top: 1px solid var(--border); padding: 3rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.95rem; background: var(--surface); }
+        footer a { color: var(--accent); text-decoration: none; font-weight: 500; }
+        .update-badge { display: inline-block; margin-top: 1rem; padding: 0.25rem 0.75rem; background: #fff; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-family: monospace; color: #94a3b8; }
     </style>
 </head>
 <body>
     <header>
-        <a href="/"><%= site.name %></a>
+        <div class="header-inner">
+            <a href="/" class="brand"><%= site.name %></a>
+            <nav>
+                <a href="/">Home</a>
+            </nav>
+        </div>
     </header>
-    <nav>
-        <a href="/">Home</a>
-    </nav>
     <main>
         <%- content %>
     </main>
     <footer>
-        <p>&copy; <%= new Date().getFullYear() %> <%= site.name %>.</p>
-        <p>Powered by <a href="https://maskanwa.com">Maskanwa</a></p>
+        <p>&copy; <%= new Date().getFullYear() %> <%= site.name %>.<br>Powered by <a href="https://maskanwa.com">Maskanwa</a></p>
+        <div class="update-badge">Updated: <%= buildTime %></div>
     </footer>
 </body>
 </html>
