@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= page.title %></title>
-    <meta name="description" content="<%= page.description || 'Discover schools and colleges in the Maskanwa region.' %>">
+    <meta name="description" content="<%= page.description || 'Discover schools, shops, and services in the Maskanwa region.' %>">
     <link rel="canonical" href="<%= page.canonical %>">
     <style>
         :root { --brand: #ff6b6b; --dark: #2d3436; --light: #f8f9fa; }
@@ -31,14 +31,14 @@
         <nav>
             <a href="https://maskanwa.com">Directory</a>
             <a href="https://maskanwa.com/about">About</a>
-            <a href="https://maskanwa.com/join">Add Your School</a>
+            <a href="https://maskanwa.com/join">Add Your Page</a>
         </nav>
     </header>
 
     <% if (page.title === site.name) { %>
     <div class="hero">
         <h1><%= site.name %></h1>
-        <p><%= page.description || "Dekhe kya aapka school hai?" %></p>
+        <p><%= page.description || "The digital directory for Maskanwa." %></p>
     </div>
     <% } %>
     
@@ -46,7 +46,7 @@
         <%- content %>
         
         <% if (page.title === site.name) { %>
-        <h2>Institution Directory</h2>
+        <h2>Directory</h2>
         <div class="directory">
             <% institutions.forEach(function(inst) { %>
                 <a href="https://<%= inst.domain %>" class="card">
