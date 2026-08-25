@@ -3,7 +3,7 @@ title: Join
 ---
 # How to Join Maskanwa
 
-Adding your institution or shop to the network is completely free and requires no coding knowledge.
+Adding your institution or shop to the network is completely free and requires no coding knowledge. 
 
 ### Who Can Join?
 * **Education:** Schools, Inter Colleges, Degree Colleges, Coaching Institutes
