@@ -1,326 +1,204 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+import fs from 'fs-extra';
+import path from 'path';
+import matter from 'gray-matter';
+import { marked } from 'marked';
+import sanitizeHtml from 'sanitize-html';
+import ejs from 'ejs';
+import { fileURLToPath } from 'url';
 
-    <!-- Primary SEO Tags -->
-    <title><%= page.title %></title>
-    <meta name="title" content="<%= page.title %>">
-    <meta name="description" content="<%= page.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.' %>">
-    <link rel="canonical" href="<%= page.canonical %>">
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
+const DIST_DIR = path.resolve(__dirname, '../dist');
+const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
+const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
-    <!-- Open Graph / Facebook / WhatsApp -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="<%= page.canonical %>">
-    <meta property="og:title" content="<%= page.title %>">
-    <meta property="og:description" content="<%= page.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.' %>">
-    <meta property="og:site_name" content="<%= site.name %>">
+const sanitizeOptions = {
+  // 1. Explicitly list allowed tags including forms
+  allowedTags: [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
+    'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
+    'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe',
+    'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
+  ],
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="<%= page.canonical %>">
-    <meta property="twitter:title" content="<%= page.title %>">
-    <meta property="twitter:description" content="<%= page.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.' %>">
+  // 2. Strict attribute isolation to protect forms
+  allowedAttributes: {
+    'a': ['href', 'name', 'target', 'title'],
+    'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
+    'iframe': ['src', 'width', 'height', 'title'],
+    'form': ['id', 'class', 'method'], // Action omitted; we intercept via JS
+    'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
+    'select': ['id', 'name', 'required', 'class'],
+    'option': ['value', 'selected'],
+    'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
+    'button': ['type', 'id', 'class'],
+    'label': ['for', 'class'],
+    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global parameters
+  },
 
-    <!-- Platform Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text x='50' y='70' font-size='65' font-family='system-ui, sans-serif' font-weight='bold' fill='white' text-anchor='middle'>M</text></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text x='50' y='70' font-size='65' font-family='system-ui, sans-serif' font-weight='bold' fill='white' text-anchor='middle'>M</text></svg>">
+  // 3. Strict URI Scheme Enforcement
+  allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+  allowedSchemesByTag: {
+    'a': ['https', 'mailto', 'tel'], 
+    'img': ['https', 'data'],        
+    'iframe': ['https']              
+  },
+  allowProtocolRelative: false,
 
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "Maskanwa Directory",
-      "url": "https://maskanwa.com",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://maskanwa.com/?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+  // 4. Content Traversal Filters for Advanced Heuristics
+  exclusiveFilter: (frame) => {
+    // Attack Block: Drop buttons or inputs executing cross-domain actions
+    if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
+      return true;
     }
-    </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --surface: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border: #e2e8f0; }
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
+    if (frame.tag === 'form' && frame.attribs.action) {
+      const isRelative = !frame.attribs.action.includes('://');
+      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com'); 
+      if (!isRelative && !isInternal) return true; 
+    }
 
-        /* Layout & Navigation */
-        header { position: sticky; top: 0; z-index: 100; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
-        .header-inner { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: -0.02em; }
-        nav a { margin-left: 2rem; color: var(--text-muted); text-decoration: none; font-weight: 500; transition: color 0.2s; font-size: 0.95rem; }
-        nav a:hover { color: var(--primary); }
+    // Empty Node Cleanup
+    if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
+      return true;
+    }
 
-        /* Hero & Typewriter Animation */
-        .hero { padding: 6rem 2rem; text-align: center; background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%); border-bottom: 1px solid var(--border); }
-        .hero h1 { font-size: 3.5rem; font-weight: 800; margin: 0 0 1rem 0; letter-spacing: -0.04em; color: var(--primary); line-height: 1.1; }
-        .typing-container { min-height: 4rem; display: flex; justify-content: center; align-items: center; }
-        .typing-text { font-size: 2.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.04em; }
-        .dynamic-word { color: var(--accent); position: relative; }
-        .dynamic-word::after { content: '|'; position: absolute; right: -12px; animation: blink 1s step-end infinite; color: var(--primary); }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    return false;
+  },
 
-        main { max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; min-height: 50vh; }
-        main h2 { font-size: 2rem; font-weight: 700; margin-top: 0; letter-spacing: -0.03em; }
-        main h3 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; }
-        main p, main ul { font-size: 1.125rem; color: #334155; }
-        main a { color: var(--accent); text-decoration: none; }
-        main a:hover { text-decoration: underline; }
+  // 5. Node Transformations and Security Hardening
+  transformTags: {
+    'a': (tagName, attribs) => {
+      if (attribs.target === '_blank') {
+        attribs.rel = attribs.rel 
+          ? [...new Set([...attribs.rel.split(' '), 'noopener', 'noreferrer'])].join(' ')
+          : 'noopener noreferrer';
+      }
+      return { tagName, attribs };
+    },
+    'form': (tagName, attribs) => {
+      attribs.method = (attribs.method || 'POST').toUpperCase();
+      return { tagName, attribs };
+    },
+    'iframe': (tagName, attribs) => {
+      attribs.sandbox = 'allow-scripts allow-same-origin';
+      return { tagName, attribs };
+    }
+  },
 
-        /* Media & Scroll Animations */
-        img, picture, video, iframe, figure { max-width: 100%; height: auto; display: block; border-radius: 12px; }
-        .fade-in-up { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
-        .fade-in-up.visible { opacity: 1; transform: translateY(0); }
+  // 6. Security Boundaries
+  allowVulnerableTags: false,
+  stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
+};
 
-        /* Directory Grid */
-        .directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-decoration: none; color: inherit; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
-        .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -10px rgba(0,0,0,0.1); border-color: #cbd5e1; }
-        .card .badge { align-self: flex-start; background: #eff6ff; color: #1d4ed8; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
-        .card h3 { margin: 0 0 0.25rem 0; font-size: 1.25rem; font-weight: 600; color: var(--primary); }
-        .card p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
+  const instPath = path.join(PUBLIC_DIR, slug);
+  const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
+  
+  if (!fs.existsSync(instPath)) return;
+  const files = await fs.readdir(instPath);
+  const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.MD'));
+  
+  const templateName = isShowcase ? 'showcase.ejs' : 'layout.ejs';
+  const template = await fs.readFile(path.join(TEMPLATES_DIR, templateName), 'utf-8');
 
-        /* Search and Filter Styles */
-        .controls { max-width: 800px; margin: 0 auto 3rem auto; display: flex; flex-direction: column; gap: 1.5rem; align-items: center; }
-        .search-bar { width: 100%; position: relative; }
-        .search-bar input { width: 100%; padding: 1rem 1.5rem; font-size: 1.1rem; border: 2px solid var(--border); border-radius: 99px; outline: none; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
-        .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
-        .filter-btn { background: var(--surface); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 999px; font-size: 0.9rem; font-weight: 500; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
-        .filter-btn:hover { border-color: #cbd5e1; color: var(--text-main); }
-        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .no-results { grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; display: none; }
+  for (const file of markdownFiles) {
+    const content = await fs.readFile(path.join(instPath, file), 'utf-8');
+    const { data: frontmatter, content: markdownBody } = matter(content);
+    
+    const rawHtml = marked.parse(markdownBody);
+    const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
+    
+    const isIndex = file.toLowerCase() === 'site.md';
+    const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
+    
+    const canonicalUrl = isShowcase 
+      ? `https://maskanwa.com{pageSlug}` 
+      : `https://${slug}://{pageSlug}`;
 
-        /* Join Form Styles */
-        .join-form { background: var(--surface); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border); margin-top: 2rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .form-group { margin-bottom: 1.25rem; }
-        .join-form label { font-weight: 600; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.5rem; display: block; }
-        .join-form input, .join-form select, .join-form textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 1rem; color: var(--text-main); background: var(--bg); transition: border-color 0.2s; box-sizing: border-box; }
-        .join-form input:focus, .join-form select:focus, .join-form textarea:focus { outline: none; border-color: var(--accent); }
-        .btn-submit { background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; margin-top: 1rem; }
-        .btn-submit:hover { background: var(--accent); }
+    const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
+    
+    const renderedPage = ejs.render(template, {
+      site: siteConfig,
+      page: { title: pageTitle, canonical: canonicalUrl, ...frontmatter },
+      content: cleanHtml,
+      slug: slug,
+      institutions: allInstitutions,
+      buildTime: buildTime
+    });
 
-        footer { border-top: 1px solid var(--border); padding: 3rem 2rem; text-align: center; color: var(--text-muted); background: var(--surface); font-size: 0.95rem; }
-        .update-badge { display: inline-block; margin-top: 1rem; padding: 0.35rem 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; font-family: monospace; }
+    const outputPath = isIndex 
+      ? path.join(distInstPath, 'index.html') 
+      : path.join(distInstPath, pageSlug, 'index.html');
+      
+    await fs.outputFile(outputPath, renderedPage);
+  }
 
-        @media (max-width: 600px) {
-            .hero h1 { font-size: 2.5rem; }
-            .typing-text { font-size: 1.6rem; }
-            .typing-container { min-height: 5rem; }
-            nav a { margin-left: 1rem; }
-            .join-form { padding: 1.5rem; }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="header-inner">
-            <a href="https://maskanwa.com" class="brand"><%= site.name %></a>
-            <nav>
-                <a href="https://maskanwa.com">Directory</a>
-                <a href="https://maskanwa.com/about">About</a>
-                <a href="https://maskanwa.com/join">Join</a>
-            </nav>
-        </div>
-    </header>
+  const assetsPath = path.join(instPath, 'assets');
+  if (fs.existsSync(assetsPath)) {
+    await fs.copy(assetsPath, path.join(distInstPath, 'assets'));
+  }
+}
 
-    <% if (page.title === site.name) { %>
-    <div class="hero">
-        <h1 class="fade-in-up"><%= site.name %><span style="color: var(--accent);">.com</span></h1>
-        <div class="typing-container fade-in-up" style="transition-delay: 100ms;">
-            <div class="typing-text">Kya Aapka <span id="typewriter" class="dynamic-word">School</span> Yahan Hai?</div>
-        </div>
-        <p class="fade-in-up" style="transition-delay: 200ms; margin-top: 1rem;"><%= page.description %></p>
-        <div class="fade-in-up" style="transition-delay: 300ms; margin-top: 2rem;">
-            <a href="https://maskanwa.com/join" style="background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 99px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">Join the Network - It's Free</a>
-        </div>
-    </div>
-    <% } %>
+async function buildPlatform() {
+  console.log('Starting Maskanwa Engine Build...');
+  await fs.emptyDir(DIST_DIR);
+  
+  // Write CNAME file at the root of ./dist to map to maskanwa.com
+  await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
+  console.log('[SUCCESS] CNAME file written for domain mapping.');
 
-    <main>
-        <div class="content-wrapper fade-in-up">
-            <%- content %>
-        </div>
+  const manifest = await fs.readJson(MANIFEST_PATH);
+  
+  const buildTime = new Date().toLocaleString('en-IN', { 
+    timeZone: 'Asia/Kolkata', 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
+  });
+  console.log(`Build Time: ${buildTime}`);
 
-        <% if (page.title === site.name) { %>
-        <h2 style="margin-top: 4rem; border-top: 1px solid var(--border); padding-top: 3rem; text-align: center;" class="fade-in-up">Explore Maskanwa</h2>
+  console.log('Building Showcase (www)...');
+  const allInstitutions = Object.values(manifest.sites);
+  await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
-        <div class="controls fade-in-up">
-            <div class="search-bar">
-                <input type="text" id="searchInput" placeholder="Search for a school, shop, or service...">
-            </div>
-            <div class="filters" id="filterContainer">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="education">Education</button>
-                <button class="filter-btn" data-filter="store">Shops & Stores</button>
-                <button class="filter-btn" data-filter="health">Healthcare</button>
-                <button class="filter-btn" data-filter="service">Services</button>
-            </div>
-        </div>
+  for (const slug of Object.keys(manifest.sites)) {
+    console.log(`Building Tenant: ${slug}...`);
+    await buildContent(slug, manifest.sites[slug], false, null, buildTime);
+  }
 
-        <div class="directory" id="directoryGrid">
-            <% institutions.forEach(function(inst) {
-                let cat = "service";
-                let t = inst.type.toLowerCase();
-                if (t.includes('school') || t.includes('college') || t.includes('institute') || t.includes('university') || t.includes('coaching')) cat = 'education';
-                else if (t.includes('store') || t.includes('shop') || t.includes('pharmacy') || t.includes('kirana')) cat = 'store';
-                else if (t.includes('hospital') || t.includes('clinic') || t.includes('pathology') || t.includes('radiologist')) cat = 'health';
-            %>
-                <a href="https://<%= inst.domain %>" class="card fade-in-up" data-category="<%= cat %>" data-search="<%= inst.name.toLowerCase() %> <%= inst.type.toLowerCase() %>">
-                    <span class="badge"><%= inst.type %></span>
-                    <h3><%= inst.name %></h3>
-                    <p><%= inst.domain %></p>
-                </a>
-            <% }); %>
-            <div class="no-results" id="noResults">No listings found matching your search.</div>
-        </div>
-        <% } %>
-    </main>
+  await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-    <footer>
-        <p>&copy; <%= new Date().getFullYear() %> <%= site.name %>. Open source architecture.</p>
-        <div class="update-badge">Updated: <%= buildTime %></div>
-    </footer>
+  await fs.outputFile(path.join(DIST_DIR, '404.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <title>404 - Not Found | Maskanwa Open Community</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f9fafb; color: #111827; }
+        .card { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        h1 { font-size: 4rem; margin: 0; color: #2563eb; letter-spacing: -0.05em; }
+        p { color: #6b7280; margin: 1rem 0 2rem 0; font-size: 1.1rem; }
+        a { background: #111827; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: 500; transition: background 0.2s; }
+        a:hover { background: #374151; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>404</h1>
+        <h2>Entity Not Found</h2>
+        <p>The requested Maskanwa network resource does not exist.</p>
+        <a href="https://maskanwa.com">Return to Directory</a>
+      </div>
+    </body>
+    </html>
+  `);
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // 1. Scroll Animations Observer
-            const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
-            const observer = new IntersectionObserver((entries, obs) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                        obs.unobserve(entry.target);
-                    }
-                });
-            }, observerOptions);
-            document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+  console.log('[SUCCESS] Platform successfully built to /dist');
+}
 
-            // 2. Typewriter Effect
-            const typewriterElement = document.getElementById('typewriter');
-            if (typewriterElement) {
-                const words = ["School", "College", "Clinic", "Kirana Store", "Coaching", "Hospital", "Business"];
-                let wordIndex = 0;
-                let charIndex = 0;
-                let isDeleting = false;
-
-                function type() {
-                    const currentWord = words[wordIndex];
-                    if (isDeleting) {
-                        typewriterElement.textContent = currentWord.substring(0, charIndex - 1);
-                        charIndex--;
-                    } else {
-                        typewriterElement.textContent = currentWord.substring(0, charIndex + 1);
-                        charIndex++;
-                    }
-
-                    let typeSpeed = isDeleting ? 50 : 100;
-
-                    if (!isDeleting && charIndex === currentWord.length) {
-                        typeSpeed = 2000;
-                        isDeleting = true;
-                    } else if (isDeleting && charIndex === 0) {
-                        isDeleting = false;
-                        wordIndex = (wordIndex + 1) % words.length;
-                        typeSpeed = 500;
-                    }
-                    setTimeout(type, typeSpeed);
-                }
-                typewriterElement.textContent = "";
-                type();
-            }
-
-            // 3. Search & Filtering Logic
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) {
-                const filterBtns = document.querySelectorAll('.filter-btn');
-                const cards = document.querySelectorAll('.card');
-                const noResults = document.getElementById('noResults');
-
-                let currentFilter = 'all';
-                let currentSearch = '';
-
-                function filterDirectory() {
-                    let visibleCount = 0;
-                    cards.forEach(card => {
-                        const matchesSearch = card.getAttribute('data-search').includes(currentSearch);
-                        const matchesCategory = currentFilter === 'all' || card.getAttribute('data-category') === currentFilter;
-                        if (matchesSearch && matchesCategory) {
-                            card.style.display = 'flex';
-                            visibleCount++;
-                        } else {
-                            card.style.display = 'none';
-                        }
-                    });
-                    noResults.style.display = visibleCount === 0 ? 'block' : 'none';
-                }
-
-                searchInput.addEventListener('input', (e) => {
-                    currentSearch = e.target.value.toLowerCase().trim();
-                    filterDirectory();
-                });
-
-                filterBtns.forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        filterBtns.forEach(b => b.classList.remove('active'));
-                        e.target.classList.add('active');
-                        currentFilter = e.target.getAttribute('data-filter');
-                        filterDirectory();
-                    });
-                });
-            }
-
-            // 4. Join Form GitHub Redirect Logic
-            const joinBtn = document.getElementById('joinBtn');
-            if (joinBtn) {
-                joinBtn.addEventListener('click', function() {
-                    const type = document.getElementById('f-type').value;
-                    const name = document.getElementById('f-name').value.trim();
-                    const desc = document.getElementById('f-desc').value.trim();
-                    const email = document.getElementById('f-email').value.trim();
-                    const phone = document.getElementById('f-phone').value.trim();
-                    const whatsapp = document.getElementById('f-whatsapp').value.trim();
-                    const map = document.getElementById('f-map').value.trim();
-
-                    if (!name) {
-                        alert("Entity Name is required!");
-                        document.getElementById('f-name').focus();
-                        return;
-                    }
-
-                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-
-                    let md = `---\
-name: ${name}\
-type: ${type}\
----\
-# ${name}\
-\
-${desc}\
-\
-## Contact Information\
-`;
-                    if (email) md += `* **Email:** ${email}\
-`;
-                    if (phone) md += `* **Phone:** ${phone}\
-`;
-                    if (whatsapp) md += `* **WhatsApp:** [Message us on WhatsApp](https://wa.me/${whatsapp.replace(/[^0-9]/g, '')})\
-`;
-                    if (map) md += `* **Location:** [View on Google Maps](${map})\
-`;
-
-                    const encodedMd = encodeURIComponent(md);
-                    const githubUrl = `https://github.com/RatioJuris/maskanwa-web/new/main/public?filename=${slug}/site.md&value=${encodedMd}`;
-
-                    window.location.href = githubUrl;
-                });
-            }
-        });
-    </script>
-</body>
-</html>
+buildPlatform().catch(err => {
+  console.error('[BUILD ERROR]', err);
+  process.exit(1);
+});
