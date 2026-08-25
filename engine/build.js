@@ -57,7 +57,6 @@ const sanitizeOptions = {
     },
     'form': (tagName, attribs) => {
       attribs.method = (attribs.method || 'POST').toUpperCase();
-      // Ensure safe action routing if action is specified externally
       if (attribs.action) {
         const isRelative = !attribs.action.includes('://');
         const isInternal = attribs.action.startsWith('https://maskanwa.com');
@@ -94,6 +93,7 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const rawHtml = marked.parse(markdownBody);
     const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
 
+    // Only 'site.md' serves as the root/index page
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
 
