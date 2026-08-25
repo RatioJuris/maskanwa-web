@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,7 +27,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text x='50' y='70' font-size='65' font-family='system-ui, sans-serif' font-weight='bold' fill='white' text-anchor='middle'>M</text></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><text x='50' y='70' font-size='65' font-family='system-ui, sans-serif' font-weight='bold' fill='white' text-anchor='middle'>M</text></svg>">
 
-    <!-- JSON-LD Structured Data for Google Search -->
+    <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -42,10 +44,12 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ... Keep your existing CSS styles below this point ... */
         :root { --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc; --surface: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border: #e2e8f0; }
         * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        
+        /* Layout & Navigation */
         header { position: sticky; top: 0; z-index: 100; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
         .header-inner { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
         .brand { font-size: 1.25rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: -0.02em; }
@@ -60,17 +64,207 @@
         main p, main ul { font-size: 1.125rem; color: #334155; }
         main a { color: var(--accent); text-decoration: none; }
         main a:hover { text-decoration: underline; }
+
+        /* Future-Proofing: Media, Embedded Video, and Sliders */
+        img, picture, video, iframe, figure { max-width: 100%; height: auto; display: block; border-radius: 12px; }
+        .aspect-video { aspect-ratio: 16 / 9; width: 100%; object-fit: cover; }
+        .css-slider { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 1rem; padding-bottom: 1rem; scrollbar-width: thin; }
+        .css-slider > * { scroll-snap-align: start; flex: 0 0 85%; }
+        
+        /* Future-Proofing: Scroll Animations */
+        .fade-in-up { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .fade-in-up.visible { opacity: 1; transform: translateY(0); }
+
+        /* Directory Grid */
         .directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-decoration: none; color: inherit; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
         .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -10px rgba(0,0,0,0.1); border-color: #cbd5e1; }
         .card .badge { align-self: flex-start; background: #eff6ff; color: #1d4ed8; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
         .card h3 { margin: 0 0 0.25rem 0; font-size: 1.25rem; font-weight: 600; color: var(--primary); }
         .card p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+        
+        /* Search and Filter Styles */
+        .controls { max-width: 800px; margin: 0 auto 3rem auto; display: flex; flex-direction: column; gap: 1.5rem; align-items: center; }
+        .search-bar { width: 100%; position: relative; }
+        .search-bar input { width: 100%; padding: 1rem 1.5rem; font-size: 1.1rem; border: 2px solid var(--border); border-radius: 99px; outline: none; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
+        .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+        .filter-btn { background: var(--surface); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 99px; font-size: 0.9rem; font-weight: 500; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
+        .filter-btn:hover { border-color: #cbd5e1; color: var(--text-main); }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .no-results { grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; display: none; }
+
+        /* Join Form Styles */
+        .join-form { background: var(--surface); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border); margin-top: 2rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 1.25rem; }
+        .join-form label { font-weight: 600; font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.5rem; display: block; }
+        .join-form input, .join-form select, .join-form textarea { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 1rem; color: var(--text-main); background: var(--bg); transition: border-color 0.2s; box-sizing: border-box; }
+        .join-form input:focus, .join-form select:focus, .join-form textarea:focus { outline: none; border-color: var(--accent); }
+        .btn-submit { background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; margin-top: 1rem; }
+        .btn-submit:hover { background: var(--accent); }
+
         footer { border-top: 1px solid var(--border); padding: 3rem 2rem; text-align: center; color: var(--text-muted); background: var(--surface); font-size: 0.95rem; }
         .update-badge { display: inline-block; margin-top: 1rem; padding: 0.35rem 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; font-family: monospace; }
+        
         @media (max-width: 600px) {
             .hero h1 { font-size: 2.5rem; }
             nav a { margin-left: 1rem; }
+            .join-form { padding: 1.5rem; }
         }
     </style>
 </head>
+<body>
+    <header>
+        <div class="header-inner">
+            <a href="https://maskanwa.com" class="brand"><%= site.name %></a>
+            <nav>
+                <a href="https://maskanwa.com">Directory</a>
+                <a href="https://maskanwa.com/about">About</a>
+                <a href="https://maskanwa.com/join">Join</a>
+            </nav>
+        </div>
+    </header>
+
+    <% if (page.title === site.name) { %>
+    <div class="hero">
+        <h1 class="fade-in-up"><%= site.name %></h1>
+        <p class="fade-in-up" style="transition-delay: 100ms;"><%= page.description || "The digital directory for Maskanwa." %></p>
+    </div>
+    <% } %>
+    
+    <main>
+        <!-- Injected Markdown Content -->
+        <div class="content-wrapper fade-in-up">
+            <%- content %>
+        </div>
+        
+        <% if (page.title === site.name) { %>
+        <h2 style="margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 3rem; text-align: center;" class="fade-in-up">Explore Maskanwa</h2>
+        
+        <div class="controls fade-in-up">
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search for a school, shop, or service...">
+            </div>
+            <div class="filters" id="filterContainer">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="education">Education</button>
+                <button class="filter-btn" data-filter="store">Shops & Stores</button>
+                <button class="filter-btn" data-filter="health">Healthcare</button>
+                <button class="filter-btn" data-filter="service">Services</button>
+            </div>
+        </div>
+
+        <div class="directory" id="directoryGrid">
+            <% institutions.forEach(function(inst) { 
+                let cat = "service";
+                let t = inst.type.toLowerCase();
+                if (t.includes('school') || t.includes('college') || t.includes('institute') || t.includes('university') || t.includes('coaching')) cat = 'education';
+                else if (t.includes('store') || t.includes('shop') || t.includes('pharmacy') || t.includes('kirana')) cat = 'store';
+                else if (t.includes('hospital') || t.includes('clinic') || t.includes('pathology') || t.includes('radiologist')) cat = 'health';
+            %>
+                <a href="https://<%= inst.domain %>" class="card fade-in-up" data-category="<%= cat %>" data-search="<%= inst.name.toLowerCase() %> <%= inst.type.toLowerCase() %>">
+                    <span class="badge"><%= inst.type %></span>
+                    <h3><%= inst.name %></h3>
+                    <p><%= inst.domain %></p>
+                </a>
+            <% }); %>
+            <div class="no-results" id="noResults">No listings found matching your search.</div>
+        </div>
+        <% } %>
+    </main>
+
+    <footer>
+        <p>&copy; <%= new Date().getFullYear() %> <%= site.name %>. Open source architecture.</p>
+        <div class="update-badge">Updated: <%= buildTime %></div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Future-Proofing: Scroll Animations
+            const observerOptions = { root: null, rootMargin: '0px', threshold: 0.1 };
+            const observer = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+            document.querySelectorAll('.fade-in-up').forEach(el => observer.observe(el));
+
+            // 2. Directory Search & Filtering Logic
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                const filterBtns = document.querySelectorAll('.filter-btn');
+                const cards = document.querySelectorAll('.card');
+                const noResults = document.getElementById('noResults');
+                
+                let currentFilter = 'all';
+                let currentSearch = '';
+
+                function filterDirectory() {
+                    let visibleCount = 0;
+                    cards.forEach(card => {
+                        const matchesSearch = card.getAttribute('data-search').includes(currentSearch);
+                        const matchesCategory = currentFilter === 'all' || card.getAttribute('data-category') === currentFilter;
+                        if (matchesSearch && matchesCategory) {
+                            card.style.display = 'flex';
+                            visibleCount++;
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                    noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+                }
+
+                searchInput.addEventListener('input', (e) => {
+                    currentSearch = e.target.value.toLowerCase().trim();
+                    filterDirectory();
+                });
+
+                filterBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        filterBtns.forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        currentFilter = e.target.getAttribute('data-filter');
+                        filterDirectory();
+                    });
+                });
+            }
+
+            // 3. Join Form Logic (Redirects to GitHub securely)
+            const joinBtn = document.getElementById('joinBtn');
+            if (joinBtn) {
+                joinBtn.addEventListener('click', function() {
+                    const type = document.getElementById('f-type').value;
+                    const name = document.getElementById('f-name').value.trim();
+                    const desc = document.getElementById('f-desc').value.trim();
+                    const email = document.getElementById('f-email').value.trim();
+                    const phone = document.getElementById('f-phone').value.trim();
+                    const whatsapp = document.getElementById('f-whatsapp').value.trim();
+                    const map = document.getElementById('f-map').value.trim();
+
+                    if (!name) { 
+                        alert("Entity Name is required!"); 
+                        document.getElementById('f-name').focus();
+                        return; 
+                    }
+
+                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+                    
+                    let md = `---\nname: ${name}\ntype: ${type}\n---\n# ${name}\n\n${desc}\n\n## Contact Information\n`;
+                    if (email) md += `* **Email:** ${email}\n`;
+                    if (phone) md += `* **Phone:** ${phone}\n`;
+                    if (whatsapp) md += `* **WhatsApp:** [Message us on WhatsApp](https://wa.me/${whatsapp.replace(/[^0-9]/g, '')})\n`;
+                    if (map) md += `* **Location:** [View on Google Maps](${map})\n`;
+
+                    const encodedMd = encodeURIComponent(md);
+                    const githubUrl = `https://github.com/RatioJuris/maskanwa-web/new/main/public?filename=${slug}/site.md&value=${encodedMd}`;
+                    
+                    window.location.href = githubUrl;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
