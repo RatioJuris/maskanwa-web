@@ -1,215 +1,911 @@
-import fs from 'fs-extra';
-import path from 'path';
-import matter from 'gray-matter';
-import { marked } from 'marked';
-import sanitizeHtml from 'sanitize-html';
-import ejs from 'ejs';
-import { fileURLToPath } from 'url';
-
+import fs from 'fs-extra'; import path from 'path'; import matter from 'gray-matter'; import { marked } from 'marked'; import sanitizeHtml from 'sanitize-html'; import ejs from 'ejs'; import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = path.resolve(__dirname, '../public');
-const DIST_DIR = path.resolve(__dirname, '../dist');
-const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
-const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
+const PUBLIC_DIR = path.resolve(__dirname, '../public'); const DIST_DIR = path.resolve(__dirname, '../dist'); const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json'); const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
+const PLATFORM_SLUG = 'www'; const SAFE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+/*
+============================================================
+SAFE FILESYSTEM RESOLUTION
+============================================================ */
+function resolveInside(baseDir, relativePath) { if ( typeof relativePath !== 'string' || !relativePath ) { throw new Error( Unsafe filesystem path detected: ${relativePath} ); }
+if (path.isAbsolute(relativePath)) {
+    throw new Error(
+        `Unsafe filesystem path detected: ${relativePath}`
+    );
+}
 
-const sanitizeOptions = {
-  // 1. Explicitly list allowed tags including forms
-  allowedTags: [
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
-    'nl', 'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
-    'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe',
-    'img', 'span', 'form', 'input', 'select', 'option', 'textarea', 'button', 'label'
-  ],
+const normalized =
+    relativePath.replace(/\\/g, '/');
 
-  // 2. Strict attribute isolation to protect forms
-  allowedAttributes: {
-    'a': ['href', 'name', 'target', 'title'],
-    'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
-    'iframe': ['src', 'width', 'height', 'title'],
-    'form': ['id', 'class', 'method'], // Action omitted; we intercept via JS
-    'input': ['type', 'id', 'name', 'placeholder', 'required', 'class', 'value', 'checked'],
-    'select': ['id', 'name', 'required', 'class'],
-    'option': ['value', 'selected'],
-    'textarea': ['id', 'name', 'rows', 'placeholder', 'required', 'class'],
-    'button': ['type', 'id', 'class'],
-    'label': ['for', 'class'],
-    '*': ['id', 'class', 'aria-*', 'data-*'] // Safe global parameters
-  },
+if (
+    normalized === '..' ||
+    normalized.startsWith('../') ||
+    normalized.includes('/../') ||
+    normalized.includes('\0')
+) {
+    throw new Error(
+        `Unsafe filesystem path detected: ${relativePath}`
+    );
+}
 
-  // 3. Strict URI Scheme Enforcement
-  allowedSchemes: ['http', 'https', 'mailto', 'tel'],
-  allowedSchemesByTag: {
-    'a': ['https', 'mailto', 'tel'], 
-    'img': ['https', 'data'],        
-    'iframe': ['https']              
-  },
-  allowProtocolRelative: false,
+const base = path.resolve(baseDir);
+const resolved =
+    path.resolve(baseDir, relativePath);
 
-  // 4. Content Traversal Filters for Advanced Heuristics
-  exclusiveFilter: (frame) => {
-    // Attack Block: Drop buttons or inputs executing cross-domain actions
-    if ((frame.tag === 'input' || frame.tag === 'button') && frame.attribs.formaction) {
-      return true;
-    }
+const relative =
+    path.relative(base, resolved);
 
-    // Phishing Block: Drop forms attempting to route data to unauthorized external engines
-    if (frame.tag === 'form' && frame.attribs.action) {
-      const isRelative = !frame.attribs.action.includes('://');
-      const isInternal = frame.attribs.action.startsWith('https://maskanwa.com'); 
-      if (!isRelative && !isInternal) return true; 
-    }
+if (
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+) {
+    throw new Error(
+        `Unsafe filesystem path detected: ${relativePath}`
+    );
+}
 
-    // Empty Node Cleanup
-    if (['p', 'span', 'div'].includes(frame.tag) && !frame.text.trim() && !Object.keys(frame.attribs).length) {
-      return true;
-    }
+return resolved;
+}
+function resolvePlatformSource() { return resolveInside( PUBLIC_DIR, PLATFORM_SLUG ); }
+function resolveTenantSource(slug) { if ( typeof slug !== 'string' || !SAFE_SLUG_PATTERN.test(slug) || slug.toLowerCase() === PLATFORM_SLUG ) { throw new Error( Unsafe tenant slug detected: ${slug} ); }
+return resolveInside(
+    PUBLIC_DIR,
+    slug
+);
+}
+function resolveTenantOutput(slug) { if ( typeof slug !== 'string' || !SAFE_SLUG_PATTERN.test(slug) ) { throw new Error( Unsafe tenant output slug detected: ${slug} ); }
+return resolveInside(
+    DIST_DIR,
+    slug
+);
+}
+/*
+============================================================
+HTML SANITIZATION
+============================================================
+Markdown may contain useful HTML such as:
+forms
+video
+audio
+iframe / YouTube
+tables
+details / summary
+semantic HTML
+Dangerous scripting remains prohibited. */
+const sanitizeOptions = { allowedTags: [ ...sanitizeHtml.defaults.allowedTags,
+    'img',
 
-    return false;
-  },
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
 
-  // 5. Node Transformations and Security Hardening
-  transformTags: {
-    'a': (tagName, attribs) => {
-      if (attribs.target === '_blank') {
-        attribs.rel = attribs.rel 
-          ? [...new Set([...attribs.rel.split(' '), 'noopener', 'noreferrer'])].join(' ')
-          : 'noopener noreferrer';
-      }
-      return { tagName, attribs };
-    },
-    'form': (tagName, attribs) => {
-      attribs.method = (attribs.method || 'POST').toUpperCase();
-      return { tagName, attribs };
-    },
-    'iframe': (tagName, attribs) => {
-      attribs.sandbox = 'allow-scripts allow-same-origin';
-      return { tagName, attribs };
-    }
-  },
+    'span',
+    'div',
 
-  // 6. Security Boundaries (Fixed invalid empty regex syntax)
-  allowVulnerableTags: false,
-  stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
+    'strong',
+    'em',
+
+    'ul',
+    'ol',
+    'li',
+
+    'a',
+
+    'blockquote',
+
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'tr',
+    'th',
+    'td',
+
+    'figure',
+    'figcaption',
+
+    'picture',
+    'source',
+
+    'video',
+    'audio',
+    'track',
+
+    'iframe',
+
+    'details',
+    'summary',
+
+    'section',
+    'article',
+    'aside',
+    'header',
+    'footer',
+    'main',
+    'nav',
+
+    'form',
+    'label',
+    'input',
+    'textarea',
+    'select',
+    'option',
+    'button',
+
+    'br',
+    'hr',
+
+    'pre',
+    'code',
+
+    'kbd',
+    'mark',
+    'small',
+    'sub',
+    'sup'
+],
+
+allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+
+    img: [
+        'src',
+        'alt',
+        'title',
+        'width',
+        'height',
+        'loading',
+        'decoding'
+    ],
+
+    a: [
+        'href',
+        'target',
+        'rel',
+        'title'
+    ],
+
+    iframe: [
+        'src',
+        'title',
+        'width',
+        'height',
+        'allow',
+        'allowfullscreen',
+        'loading',
+        'referrerpolicy',
+        'frameborder'
+    ],
+
+    video: [
+        'src',
+        'poster',
+        'width',
+        'height',
+        'controls',
+        'autoplay',
+        'muted',
+        'loop',
+        'playsinline',
+        'preload'
+    ],
+
+    audio: [
+        'src',
+        'controls',
+        'autoplay',
+        'muted',
+        'loop',
+        'preload'
+    ],
+
+    source: [
+        'src',
+        'srcset',
+        'type',
+        'media'
+    ],
+
+    track: [
+        'src',
+        'kind',
+        'srclang',
+        'label',
+        'default'
+    ],
+
+    form: [
+        'action',
+        'method',
+        'target',
+        'autocomplete'
+    ],
+
+    input: [
+        'type',
+        'name',
+        'value',
+        'placeholder',
+        'required',
+        'checked',
+        'disabled',
+        'readonly',
+        'min',
+        'max',
+        'step',
+        'pattern',
+        'autocomplete'
+    ],
+
+    textarea: [
+        'name',
+        'placeholder',
+        'required',
+        'readonly',
+        'disabled',
+        'rows',
+        'cols'
+    ],
+
+    select: [
+        'name',
+        'required',
+        'disabled'
+    ],
+
+    option: [
+        'value',
+        'selected',
+        'disabled'
+    ],
+
+    button: [
+        'type',
+        'name',
+        'value',
+        'disabled'
+    ],
+
+    details: [
+        'open'
+    ]
+},
+
+allowedSchemes: [
+    'http',
+    'https',
+    'mailto',
+    'tel'
+],
+
+allowedSchemesByTag: {
+    img: [
+        'http',
+        'https'
+    ],
+
+    iframe: [
+        'http',
+        'https'
+    ],
+
+    video: [
+        'http',
+        'https'
+    ],
+
+    audio: [
+        'http',
+        'https'
+    ],
+
+    source: [
+        'http',
+        'https'
+    ],
+
+    track: [
+        'http',
+        'https'
+    ],
+
+    a: [
+        'http',
+        'https',
+        'mailto',
+        'tel'
+    ]
+}
 };
+/*
+============================================================
+BUILD CONTENT
+============================================================ */
+async function buildContent( slug, siteConfig, isShowcase, allInstitutions = null, buildTime ) { const instPath = isShowcase ? resolvePlatformSource() : resolveTenantSource(slug);
+const distInstPath = isShowcase
+    ? resolveInside(
+        DIST_DIR,
+        PLATFORM_SLUG
+    )
+    : resolveTenantOutput(slug);
 
-async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
-  const instPath = path.join(PUBLIC_DIR, slug);
-  const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
-  
-  if (!fs.existsSync(instPath)) return;
-  const files = await fs.readdir(instPath);
-  const markdownFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.MD'));
-  
-  const templateName = isShowcase ? 'showcase.ejs' : 'layout.ejs';
-  const template = await fs.readFile(path.join(TEMPLATES_DIR, templateName), 'utf-8');
-
-  for (const file of markdownFiles) {
-    const content = await fs.readFile(path.join(instPath, file), 'utf-8');
-    const { data: frontmatter, content: markdownBody } = matter(content);
-    
-    const rawHtml = marked.parse(markdownBody);
-    const cleanHtml = sanitizeHtml(rawHtml, sanitizeOptions);
-    
-    const isIndex = file.toLowerCase() === 'site.md';
-    const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
-    
-    // Fixed string interpolation template literals
-    const canonicalUrl = isShowcase 
-      ? `https://maskanwa.com/${pageSlug}` 
-      : `https://${slug}.maskanwa.com/${pageSlug}`;
-
-    const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
-    
-    // Provide structuredData payload to prevent template reference errors
-    const jsonLdPayload = {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": siteConfig.name,
-      "url": canonicalUrl,
-      "description": frontmatter.description || siteConfig.description || 'The central digital directory for every school, college, shop, and service in Maskanwa.'
-    };
-
-    const renderedPage = ejs.render(template, {
-      site: siteConfig,
-      page: { title: pageTitle, canonical: canonicalUrl, ...frontmatter },
-      content: cleanHtml,
-      slug: slug,
-      institutions: allInstitutions,
-      buildTime: buildTime,
-      structuredData: JSON.stringify(jsonLdPayload, null, 2)
-    });
-
-    const outputPath = isIndex 
-      ? path.join(distInstPath, 'index.html') 
-      : path.join(distInstPath, pageSlug, 'index.html');
-      
-    await fs.outputFile(outputPath, renderedPage);
-  }
-
-  const assetsPath = path.join(instPath, 'assets');
-  if (fs.existsSync(assetsPath)) {
-    await fs.copy(assetsPath, path.join(distInstPath, 'assets'));
-  }
+if (!(await fs.pathExists(instPath))) {
+    throw new Error(
+        `Content directory not found: ${instPath}`
+    );
 }
 
+const files =
+    await fs.readdir(instPath);
+
+const markdownFiles =
+    files.filter(
+        file =>
+            file
+                .toLowerCase()
+                .endsWith('.md')
+    );
+
+const templateName = isShowcase
+    ? 'showcase.ejs'
+    : 'layout.ejs';
+
+const template =
+    await fs.readFile(
+        path.join(
+            TEMPLATES_DIR,
+            templateName
+        ),
+        'utf-8'
+    );
+
+
+/*
+ * --------------------------------------------------------
+ * BUILD EVERY MARKDOWN PAGE
+ * --------------------------------------------------------
+ */
+
+for (const file of markdownFiles) {
+
+    const filePath =
+        resolveInside(
+            instPath,
+            file
+        );
+
+    const content =
+        await fs.readFile(
+            filePath,
+            'utf-8'
+        );
+
+    const {
+        data: frontmatter,
+        content: markdownBody
+    } = matter(content);
+
+
+    /*
+     * Markdown → HTML
+     */
+
+    const rawHtml =
+        marked.parse(
+            markdownBody
+        );
+
+    const cleanHtml =
+        sanitizeHtml(
+            rawHtml,
+            sanitizeOptions
+        );
+
+
+    /*
+     * Page routing
+     */
+
+    const isIndex =
+        file.toLowerCase() === 'site.md';
+
+    const pageSlug =
+        isIndex
+            ? ''
+            : file.replace(
+                /\.md$/i,
+                ''
+            );
+
+
+    /*
+     * Canonical URL
+     */
+
+    const canonicalUrl =
+        isShowcase
+            ? `https://maskanwa.com/${pageSlug}`
+            : `https://${slug}.maskanwa.com/${pageSlug}`;
+
+
+    /*
+     * Page title
+     */
+
+    const pageTitle =
+        isIndex
+            ? siteConfig.name
+            : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
+
+
+    /*
+     * ====================================================
+     * JSON-LD
+     * ====================================================
+     *
+     * IMPORTANT:
+     * This is deliberately INSIDE buildContent().
+     *
+     * It depends on page-specific variables such as:
+     *
+     * - siteConfig
+     * - canonicalUrl
+     *
+     * Therefore it must never exist at module scope.
+     */
+
+    const siteType =
+        String(
+            siteConfig.type || ''
+        ).toLowerCase();
+
+
+    const structuredData =
+        JSON.stringify(
+            {
+                "@context":
+                    "https://schema.org",
+
+                "@type":
+                    siteType.includes('school') ||
+                    siteType.includes('college')
+                        ? "EducationalOrganization"
+                        : "LocalBusiness",
+
+                "name":
+                    siteConfig.name,
+
+                "url":
+                    canonicalUrl,
+
+                "areaServed": {
+                    "@type": "Place",
+                    "name":
+                        "Maskanwa, Uttar Pradesh"
+                }
+            },
+            null,
+            2
+        );
+
+
+    /*
+     * ====================================================
+     * EJS RENDER
+     * ====================================================
+     */
+
+    const renderedPage =
+        ejs.render(
+            template,
+            {
+                site:
+                    siteConfig,
+
+                page: {
+                    title:
+                        pageTitle,
+
+                    canonical:
+                        canonicalUrl,
+
+                    ...frontmatter
+                },
+
+                content:
+                    cleanHtml,
+
+                slug,
+
+                institutions:
+                    allInstitutions,
+
+                buildTime,
+
+                structuredData
+            }
+        );
+
+
+    /*
+     * ====================================================
+     * OUTPUT
+     * ====================================================
+     */
+
+    const outputPath =
+        isIndex
+            ? resolveInside(
+                distInstPath,
+                'index.html'
+            )
+            : resolveInside(
+                distInstPath,
+                path.join(
+                    pageSlug,
+                    'index.html'
+                )
+            );
+
+    await fs.outputFile(
+        outputPath,
+        renderedPage
+    );
+}
+
+
+/*
+ * --------------------------------------------------------
+ * COPY ASSETS
+ * --------------------------------------------------------
+ */
+
+const assetsPath =
+    resolveInside(
+        instPath,
+        'assets'
+    );
+
+if (
+    await fs.pathExists(
+        assetsPath
+    ) &&
+    (
+        await fs.stat(
+            assetsPath
+        )
+    ).isDirectory()
+) {
+    await fs.copy(
+        assetsPath,
+        resolveInside(
+            distInstPath,
+            'assets'
+        )
+    );
+}
+}
+/*
+============================================================
+PLATFORM BUILD
+============================================================ */
 async function buildPlatform() {
-  console.log('Starting Maskanwa Engine Build...');
-  await fs.emptyDir(DIST_DIR);
-  
-  // Write CNAME file at the root of ./dist to map to maskanwa.com
-  await fs.outputFile(path.join(DIST_DIR, 'CNAME'), 'maskanwa.com');
-  console.log('[SUCCESS] CNAME file written for domain mapping.');
+console.log(
+    '========================================'
+);
 
-  const manifest = await fs.readJson(MANIFEST_PATH);
-  
-  const buildTime = new Date().toLocaleString('en-IN', { 
-    timeZone: 'Asia/Kolkata', 
-    dateStyle: 'medium', 
-    timeStyle: 'short' 
-  });
-  console.log(`Build Time: ${buildTime}`);
+console.log(
+    '      MASKANWA OPEN COMMUNITY'
+);
 
-  console.log('Building Showcase (www)...');
-  const allInstitutions = Object.values(manifest.sites);
-  await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
+console.log(
+    '          Build Engine'
+);
 
-  for (const slug of Object.keys(manifest.sites)) {
-    console.log(`Building Tenant: ${slug}...`);
-    await buildContent(slug, manifest.sites[slug], false, null, buildTime);
-  }
+console.log(
+    '========================================'
+);
 
-  await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
 
-  await fs.outputFile(path.join(DIST_DIR, '404.html'), `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>404 - Not Found | Maskanwa Open Community</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body { font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f9fafb; color: #111827; }
-        .card { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
-        h1 { font-size: 4rem; margin: 0; color: #2563eb; letter-spacing: -0.05em; }
-        p { color: #6b7280; margin: 1rem 0 2rem 0; font-size: 1.1rem; }
-        a { background: #111827; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: 500; transition: background 0.2s; }
-        a:hover { background: #374151; }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <h1>404</h1>
-        <h2>Entity Not Found</h2>
-        <p>The requested Maskanwa network resource does not exist.</p>
-        <a href="https://maskanwa.com">Return to Directory</a>
-      </div>
-    </body>
-    </html>
-  `);
+/*
+ * Clean previous build
+ */
 
-  console.log('[SUCCESS] Platform successfully built to /dist');
+await fs.emptyDir(
+    DIST_DIR
+);
+
+
+/*
+ * Load platform manifest
+ */
+
+const manifest =
+    await fs.readJson(
+        MANIFEST_PATH
+    );
+
+
+/*
+ * Build timestamp
+ * India Standard Time
+ */
+
+const buildTime =
+    new Date().toLocaleString(
+        'en-IN',
+        {
+            timeZone:
+                'Asia/Kolkata',
+
+            dateStyle:
+                'medium',
+
+            timeStyle:
+                'short'
+        }
+    );
+
+
+console.log(
+    `Build Time: ${buildTime}`
+);
+
+
+/*
+ * ========================================================
+ * 1. MASKANWA SHOWCASE
+ * ========================================================
+ */
+
+console.log(
+    '[1/3] Building Maskanwa showcase...'
+);
+
+
+const allInstitutions =
+    Object.values(
+        manifest.sites || {}
+    );
+
+
+await buildContent(
+    PLATFORM_SLUG,
+    manifest.platform,
+    true,
+    allInstitutions,
+    buildTime
+);
+
+
+/*
+ * ========================================================
+ * 2. INSTITUTION TENANTS
+ * ========================================================
+ */
+
+console.log(
+    '[2/3] Building institutions...'
+);
+
+
+for (
+    const slug of Object.keys(
+        manifest.sites || {}
+    )
+) {
+
+    if (
+        slug.toLowerCase() ===
+        PLATFORM_SLUG
+    ) {
+        throw new Error(
+            'Reserved slug "www" cannot be used as an institution.'
+        );
+    }
+
+
+    console.log(
+        `Building Tenant: ${slug}...`
+    );
+
+
+    await buildContent(
+        slug,
+        manifest.sites[slug],
+        false,
+        null,
+        buildTime
+    );
 }
 
-buildPlatform().catch(err => {
-  console.error('[BUILD ERROR]', err);
-  process.exit(1);
-});
+
+/*
+ * ========================================================
+ * 3. FINALIZATION
+ * ========================================================
+ */
+
+console.log(
+    '[3/3] Finalizing...'
+);
+
+
+/*
+ * Copy manifest
+ */
+
+await fs.copy(
+    MANIFEST_PATH,
+    resolveInside(
+        DIST_DIR,
+        'manifest.json'
+    )
+);
+
+
+/*
+ * ========================================================
+ * 404 PAGE
+ * ========================================================
+ */
+
+await fs.outputFile(
+    resolveInside(
+        DIST_DIR,
+        '404.html'
+    ),
+
+    `<!DOCTYPE html>
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>
+    404 - Not Found | Maskanwa
+</title>
+
+<style>
+
+    body {
+        font-family:
+            Inter,
+            system-ui,
+            sans-serif;
+
+        display:
+            flex;
+
+        align-items:
+            center;
+
+        justify-content:
+            center;
+
+        min-height:
+            100vh;
+
+        margin:
+            0;
+
+        background:
+            #f9fafb;
+
+        color:
+            #111827;
+    }
+
+    .card {
+        text-align:
+            center;
+
+        background:
+            white;
+
+        padding:
+            3rem;
+
+        border-radius:
+            12px;
+
+        box-shadow:
+            0 4px 6px -1px
+            rgba(0,0,0,.1);
+
+        border:
+            1px solid
+            #e5e7eb;
+    }
+
+    h1 {
+        font-size:
+            4rem;
+
+        margin:
+            0;
+
+        color:
+            #2563eb;
+
+        letter-spacing:
+            -.05em;
+    }
+
+    p {
+        color:
+            #6b7280;
+
+        margin:
+            1rem 0 2rem;
+
+        font-size:
+            1.1rem;
+    }
+
+    a {
+        background:
+            #111827;
+
+        color:
+            white;
+
+        padding:
+            .75rem 1.5rem;
+
+        text-decoration:
+            none;
+
+        border-radius:
+            8px;
+
+        font-weight:
+            500;
+    }
+
+    a:hover {
+        background:
+            #374151;
+    }
+
+</style>
+<div class="card">
+
+    <h1>404</h1>
+
+    <h2>
+        Entity Not Found
+    </h2>
+
+    <p>
+        The requested Maskanwa page
+        or subdomain does not exist.
+    </p>
+
+    <a href="https://maskanwa.com">
+        Return to Directory
+    </a>
+
+</div>
+console.log(
+    '[SUCCESS] Platform successfully built to /dist'
+);
+}
+/*
+============================================================
+START BUILD
+============================================================ */
+buildPlatform().catch( error => {
+    console.error(
+        '[BUILD ERROR]',
+        error
+    );
+
+    process.exit(1);
+}
+);
