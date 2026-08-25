@@ -87,15 +87,14 @@ const sanitizeOptions = {
     }
   },
 
-  // 6. Security Boundaries (Fixed valid RegExp instead of empty //g)
+  // 6. Security Boundaries (Fixed invalid empty regex syntax)
   allowVulnerableTags: false,
   stripHtmlByRegexp: /<!--[\s\S]*?-->/g 
 };
 
 async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
   const instPath = path.join(PUBLIC_DIR, slug);
-  // UNIFORM PATH: Treat 'www' and tenants the same so worker matches /www/ and /{slug}/ folders
-  const distInstPath = path.join(DIST_DIR, slug);
+  const distInstPath = isShowcase ? DIST_DIR : path.join(DIST_DIR, slug);
   
   if (!fs.existsSync(instPath)) return;
   const files = await fs.readdir(instPath);
@@ -114,14 +113,14 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
     const isIndex = file.toLowerCase() === 'site.md';
     const pageSlug = isIndex ? '' : file.replace(/\.md$/i, '');
     
-    // Corrected string interpolation syntax
+    // Fixed string interpolation template literals
     const canonicalUrl = isShowcase 
       ? `https://maskanwa.com/${pageSlug}` 
       : `https://${slug}.maskanwa.com/${pageSlug}`;
 
     const pageTitle = isIndex ? siteConfig.name : `${frontmatter.title || pageSlug} - ${siteConfig.name}`;
     
-    // Provide structuredData to satisfy layout.ejs
+    // Provide structuredData payload to prevent template reference errors
     const jsonLdPayload = {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -172,7 +171,6 @@ async function buildPlatform() {
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
-  // Now builds into dist/www/ matching how Cloudflare worker expects subfolder routing
   await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
   for (const slug of Object.keys(manifest.sites)) {
