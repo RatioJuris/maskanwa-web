@@ -13,11 +13,11 @@ const MANIFEST_PATH = path.resolve(__dirname, '../manifest.json');
 const TEMPLATES_DIR = path.resolve(__dirname, 'templates');
 
 const sanitizeOptions = {
-  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'h3', 'h4', 'span', 'div']),
-  allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, 'img': ['src', 'alt', 'loading'] }
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'h3', 'h4', 'span', 'div', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td']),
+  allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, 'img': ['src', 'alt', 'loading'], 'a': ['href', 'target', 'rel'] }
 };
 
-async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null) {
+async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null, buildTime) {
   const instPath = path.join(PUBLIC_DIR, slug);
   const distInstPath = path.join(DIST_DIR, slug);
   
@@ -47,7 +47,8 @@ async function buildContent(slug, siteConfig, isShowcase, allInstitutions = null
       page: { title: pageTitle, canonical: canonicalUrl, ...frontmatter },
       content: cleanHtml,
       slug: slug,
-      institutions: allInstitutions
+      institutions: allInstitutions,
+      buildTime: buildTime
     });
 
     const outputPath = isIndex 
@@ -67,14 +68,23 @@ async function buildPlatform() {
   console.log('Starting Maskanwa Engine Build...');
   await fs.emptyDir(DIST_DIR);
   const manifest = await fs.readJson(MANIFEST_PATH);
+  
+  // Format the exact build time for IST
+  const buildTime = new Date().toLocaleString('en-IN', { 
+    timeZone: 'Asia/Kolkata', 
+    dateStyle: 'medium', 
+    timeStyle: 'short' 
+  });
+
+  console.log(`Build Time: ${buildTime}`);
 
   console.log('Building Showcase (www)...');
   const allInstitutions = Object.values(manifest.sites);
-  await buildContent('www', manifest.platform, true, allInstitutions);
+  await buildContent('www', manifest.platform, true, allInstitutions, buildTime);
 
   for (const slug of Object.keys(manifest.sites)) {
     console.log(`Building Tenant: ${slug}...`);
-    await buildContent(slug, manifest.sites[slug], false);
+    await buildContent(slug, manifest.sites[slug], false, null, buildTime);
   }
 
   await fs.copy(MANIFEST_PATH, path.join(DIST_DIR, 'manifest.json'));
@@ -82,12 +92,25 @@ async function buildPlatform() {
   await fs.outputFile(path.join(DIST_DIR, '404.html'), `
     <!DOCTYPE html>
     <html lang="en">
-    <head><title>404 - Not Found | Maskanwa</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-    <body style="font-family: system-ui, sans-serif; text-align: center; padding: 10% 20px; background: #f8f9fa;">
-      <h1 style="color: #dc3545; font-size: 3rem; margin-bottom: 10px;">404</h1>
-      <h2>Entity Not Found</h2>
-      <p style="color: #6c757d; max-width: 500px; margin: 0 auto 30px;">The requested Maskanwa subdomain does not exist.</p>
-      <a href="https://maskanwa.com" style="background: #0d6efd; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Return to Directory</a>
+    <head>
+      <title>404 - Not Found | Maskanwa</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f9fafb; color: #111827; }
+        .card { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        h1 { font-size: 4rem; margin: 0; color: #2563eb; letter-spacing: -0.05em; }
+        p { color: #6b7280; margin: 1rem 0 2rem 0; font-size: 1.1rem; }
+        a { background: #111827; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: 500; transition: background 0.2s; }
+        a:hover { background: #374151; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>404</h1>
+        <h2>Entity Not Found</h2>
+        <p>The requested Maskanwa subdomain does not exist.</p>
+        <a href="https://maskanwa.com">Return to Directory</a>
+      </div>
     </body>
     </html>
   `);
