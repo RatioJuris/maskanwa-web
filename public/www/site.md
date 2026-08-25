@@ -1,7 +1,7 @@
 ---
 name: Maskanwa
 type: platform
-description: "The digital directory and zero-friction hosting platform bringing every business and institution in the Maskanwa region online."
+description: "From Maskanwa Bazar to the World: Ab Har Vyapaar Chamki!"
 ---
 
 <!-- Native Pico CSS Grid for the Core Features -->
